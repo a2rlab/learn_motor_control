@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Motor Control Lab — learn motors, PWM, H-bridges and PID</title>
+<meta name="description" content="Interactive simulations for mechatronics students: DC, servo and stepper motors in 3D, PWM, H-bridge driving, PID tuning with an encoder, and balancing an inverted pendulum.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --paper:#E7EBEE; --surface:#F8FAFB; --stage:#F0F3F5; --ink:#16212B; --muted:#56636F; --line:#CBD3DA; --grid:rgba(22,33,43,.06);
+  --copper:#B05D27; --field:#2A64D2; --north:#C23E2C; --ok:#2B845A; --warn:#C23E2C; --amber:#B7860B;
+  --rail:#16212B; --rail-ink:#DCE3E8; --rail-muted:#8C9AA6; --rail-hi:#22303C;
+  --font:"Barlow", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --cond:"Barlow Condensed", "Arial Narrow", "Barlow", sans-serif;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F151B; --surface:#172029; --stage:#121A21; --ink:#E1E7EC; --muted:#94A2AE; --line:#2B3742; --grid:rgba(225,231,236,.05);
+    --copper:#E18B4E; --field:#6F9CF3; --north:#EC6A52; --ok:#4FBD86; --warn:#EC6A52; --amber:#E2B53C;
+    --rail:#0A0F14; --rail-ink:#DCE3E8; --rail-muted:#7F8D99; --rail-hi:#18222C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+    --paper:#0F151B; --surface:#172029; --stage:#121A21; --ink:#E1E7EC; --muted:#94A2AE; --line:#2B3742; --grid:rgba(225,231,236,.05);
+    --copper:#E18B4E; --field:#6F9CF3; --north:#EC6A52; --ok:#4FBD86; --warn:#EC6A52; --amber:#E2B53C;
+    --rail:#0A0F14; --rail-ink:#DCE3E8; --rail-muted:#7F8D99; --rail-hi:#18222C;
+    color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--field);outline-offset:2px}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);color:var(--rail-ink);position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:22px 14px 18px;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 22px}
+.brand svg{flex:none}
+.brand b{font:700 22px/1 var(--cond);letter-spacing:.01em}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.steps a{display:grid;grid-template-columns:30px 1fr;gap:6px;align-items:start;padding:10px 8px;border-radius:6px;color:inherit;text-decoration:none;position:relative}
+.steps a:hover{background:var(--rail-hi)}
+.steps a[aria-current="page"]{background:var(--rail-hi)}
+.steps a[aria-current="page"]::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:3px;background:var(--copper);border-radius:0 2px 2px 0}
+.steps .n{font:600 20px/1.1 var(--cond);color:var(--rail-muted)}
+.steps a[aria-current="page"] .n{color:var(--copper)}
+.steps b{display:block;font-weight:600;font-size:15px;line-height:1.25}
+.steps small{display:block;color:var(--rail-muted);font-size:13px;line-height:1.3;margin-top:2px}
+.rail .foot{margin-top:auto;padding:18px 8px 0;font-size:12.5px;color:var(--rail-muted);line-height:1.45}
+.rail .foot button{background:none;border:1px solid var(--rail-hi);color:var(--rail-ink);border-radius:5px;padding:5px 9px;font-size:12.5px;cursor:pointer;margin-top:10px}
+
+main{min-width:0;padding:28px 32px 60px}
+.mod{display:none;max-width:1440px}
+.mod.active{display:block}
+.mod-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 28px;margin-bottom:18px}
+.mod-head h1{font:700 clamp(30px,3.2vw,42px)/1 var(--cond);margin:0 0 8px;letter-spacing:-.005em}
+.mod-head p{margin:0;color:var(--muted);max-width:62ch}
+
+/* segmented tabs */
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-weight:500;font-size:14.5px;color:var(--muted)}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.seg.small button{padding:5px 10px;font-size:13.5px}
+
+/* workspace */
+.work{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start}
+.stage{position:relative;background-color:var(--stage);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;border:1px solid var(--line);border-radius:10px;overflow:hidden;min-height:420px}
+.stage canvas{display:block;width:100%}
+.stage .cap{position:absolute;left:14px;top:12px;font-size:13px;color:var(--muted);pointer-events:none}
+.plot-wrap{border-top:1px solid var(--line);position:relative}
+.plot-wrap .legend{position:absolute;right:12px;top:8px;display:flex;gap:12px;font-size:12.5px;color:var(--muted);pointer-events:none;flex-wrap:wrap;justify-content:flex-end}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.legend i.dash{background:repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 7px)!important;height:2px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 16px 14px}
+.grp{padding:12px 0;border-bottom:1px solid var(--line)}
+.grp:last-child{border-bottom:0}
+.grp h3{margin:0 0 8px;font:600 13.5px/1.3 var(--font);color:var(--muted)}
+.ctl{margin:8px 0 10px}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px;margin-bottom:3px}
+.ctl output{font:600 16px/1 var(--cond);font-variant-numeric:tabular-nums}
+.ctl output small{font:500 12px var(--font);color:var(--muted);margin-left:2px}
+.ctl .num{width:76px;text-align:right;border:1px solid var(--line);background:var(--stage);border-radius:4px;padding:1px 6px;font:600 15px/1.4 var(--cond)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--copper) var(--p,50%),var(--line) var(--p,50%))}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--copper)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--surface);border:2px solid var(--copper);margin-top:-6px}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--surface);border:2px solid var(--copper)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--stage);padding:7px 12px;border-radius:6px;cursor:pointer;font-weight:500;font-size:14px;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.btn.danger{color:var(--warn)}
+.btn[aria-pressed="true"]{background:var(--copper);border-color:var(--copper);color:#fff}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0;cursor:pointer}
+.chk input{accent-color:var(--copper);width:16px;height:16px}
+select{border:1px solid var(--line);background:var(--stage);border-radius:6px;padding:6px 8px;font-size:14px;width:100%}
+
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:10px 12px}
+.ro span{display:block;font-size:12.5px;color:var(--muted);line-height:1.2}
+.ro b{font:600 24px/1.15 var(--cond);font-variant-numeric:tabular-nums}
+.ro b small{font:500 13px var(--font);color:var(--muted);margin-left:2px}
+.status{font-size:14px;padding:8px 10px;border-radius:6px;background:var(--stage);border-left:3px solid var(--muted);line-height:1.4}
+.status.ok{border-color:var(--ok)} .status.warn{border-color:var(--warn)} .status.info{border-color:var(--field)}
+.status b{font-weight:600}
+
+code,pre{font-family:ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;font-size:13.5px}
+pre.code{margin:0;background:var(--stage);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow-x:auto;line-height:1.5}
+pre.code .k{color:var(--field)} pre.code .c{color:var(--muted)} pre.code .v{color:var(--copper);font-weight:600}
+
+/* learn section */
+.learn{margin-top:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px 34px;align-items:start}
+.learn article{max-width:68ch}
+.learn h2{font:600 23px/1.15 var(--cond);margin:0 0 6px}
+.learn h4{font-size:15px;margin:14px 0 2px}
+.learn p,.learn li{color:var(--ink);font-size:15.5px}
+.learn p{margin:0 0 10px}
+.learn ul,.learn ol{margin:0 0 10px;padding-left:20px}
+.learn li{margin:3px 0}
+.learn .note{color:var(--muted);font-size:14.5px}
+.learn table{border-collapse:collapse;font-size:14.5px;margin:6px 0 12px;width:100%}
+.learn th,.learn td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
+.learn th{font-weight:600;color:var(--muted)}
+.learn .formula{font:500 17px/1.4 var(--cond);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:6px 0 12px;display:block;overflow-x:auto}
+.tblwrap{overflow-x:auto}
+
+/* 3D labels + info */
+.lbl{position:absolute;transform:translate(-50%,-50%);font-size:12.5px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--surface);border:1px solid var(--line);white-space:nowrap;pointer-events:none;color:var(--ink)}
+.info3d{position:absolute;left:14px;bottom:14px;right:14px;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.45}
+.info3d b{display:block;font-size:15px;margin-bottom:2px}
+.hint{font-size:12.5px;color:var(--muted)}
+
+/* H-bridge svg */
+.hb svg{width:100%;height:auto;display:block}
+.hb .sw{cursor:pointer}
+.hb .sw:focus-visible rect.hit{stroke:var(--field);stroke-width:2}
+.flow{fill:none;stroke-width:4;stroke-linecap:round;stroke-dasharray:10 12;animation:flow .7s linear infinite}
+.flow.rev{animation-direction:reverse}
+@keyframes flow{to{stroke-dashoffset:-22}}
+@media (prefers-reduced-motion:reduce){.flow{animation:none;stroke-dasharray:none}}
+
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tbl-mini{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl-mini td,.tbl-mini th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:center}
+.tbl-mini tr.hi td{background:color-mix(in srgb,var(--copper) 18%,transparent);font-weight:600}
+
+/* responsive */
+@media (max-width:1100px){.work{grid-template-columns:minmax(0,1fr) 290px}}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{position:sticky;top:0;height:auto;flex-direction:row;align-items:center;padding:8px 10px;z-index:20;overflow-x:auto;gap:4px}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--rail)}
+  .rail{top:env(safe-area-inset-top,0px)}
+  .brand{padding:0 8px 0 2px}
+  .brand b{display:none}
+  .steps{flex-direction:row;gap:2px}
+  .steps a{grid-template-columns:auto;padding:6px 10px;white-space:nowrap}
+  .steps a .n{display:none}
+  .steps small{display:none}
+  .steps a[aria-current="page"]::before{left:10px;right:10px;top:auto;bottom:0;width:auto;height:3px}
+  .rail .foot{display:none}
+  main{padding:20px 14px 48px}
+  .work{grid-template-columns:1fr}
+  #m3dStage{height:440px!important}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Modules">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13" fill="none" stroke="#B05D27" stroke-width="2.5"/><circle cx="15" cy="15" r="4" fill="#DCE3E8"/><path d="M15 2v6M15 22v6M2 15h6M22 15h6" stroke="#DCE3E8" stroke-width="2.5"/></svg>
+    <b>Motor Control Lab</b>
+  </div>
+  <ol class="steps">
+    <li><a href="#motors" data-mod="motors"><span class="n">1</span><span><b>Motors inside out</b><small>DC, servo and stepper in 3D</small></span></a></li>
+    <li><a href="#pwm" data-mod="pwm"><span class="n">2</span><span><b>PWM</b><small>Duty cycle, speed and servo angle</small></span></a></li>
+    <li><a href="#hbridge" data-mod="hbridge"><span class="n">3</span><span><b>H-bridge</b><small>Direction, braking, shoot-through</small></span></a></li>
+    <li><a href="#pid" data-mod="pid"><span class="n">4</span><span><b>PID with an encoder</b><small>Tune a geared DC motor</small></span></a></li>
+    <li><a href="#balance" data-mod="balance"><span class="n">5</span><span><b>Balancing</b><small>Inverted pendulum and robot</small></span></a></li>
+  </ol>
+  <div class="foot">
+    Everything runs in your browser. The physics models are simplified on purpose so the important effects stay visible.
+    <br><button type="button" id="themeBtn">Switch light/dark</button>
+  </div>
+</nav>
+
+<main>
+<!-- =============== 1 MOTORS =============== -->
+<section class="mod" id="mod-motors" aria-labelledby="h-motors">
+  <header class="mod-head">
+    <div>
+      <h1 id="h-motors">Motors inside out</h1>
+      <p>Take a motor apart, spin it, and click any part to see what it does. Drag to orbit, scroll or pinch to zoom.</p>
+    </div>
+    <div class="seg" id="motorTabs" role="group" aria-label="Motor type">
+      <button type="button" data-v="dc" aria-pressed="true">Brushed DC</button>
+      <button type="button" data-v="servo" aria-pressed="false">Hobby servo</button>
+      <button type="button" data-v="stepper" aria-pressed="false">Stepper</button>
+    </div>
+  </header>
+  <div class="work">
+    <div class="stage" id="m3dStage" style="height:600px">
+      <canvas id="m3d" aria-label="3D motor model"></canvas>
+      <div id="m3dLabels"></div>
+      <div class="info3d" id="m3dInfo"><b>Click a part</b>Each part explains itself. Use the teardown slider to pull the motor apart.</div>
+    </div>
+    <aside class="panel" id="m3dPanel">
+      <div class="grp">
+        <h3>View</h3>
+        <div id="m3dView"></div>
+        <label class="chk"><input type="checkbox" id="m3dLabelsChk" checked> Show part names</label>
+        <label class="chk"><input type="checkbox" id="m3dFieldChk" checked> Show magnetic field</label>
+        <label class="chk"><input type="checkbox" id="m3dCaseChk" checked> Show housing</label>
+      </div>
+      <div class="grp" id="m3dCtlDC"></div>
+      <div class="grp" id="m3dCtlServo" hidden></div>
+      <div class="grp" id="m3dCtlStep" hidden></div>
+      <div class="grp"><h3>Live readout</h3><div class="readouts" id="m3dRo"></div></div>
+    </aside>
+  </div>
+  <div class="learn" id="learnMotors">
+    <article data-for="dc">
+      <h2>How a brushed DC motor turns</h2>
+      <p>Current through a coil turns the rotor's iron arms into electromagnets. Each arm is pulled toward the opposite pole of the permanent magnets in the housing and pushed away from the like pole. That pull produces torque.</p>
+      <p>Left alone, an arm would stop once it lines up with the magnet it is attracted to. The <b>commutator</b> prevents that: it is a split copper ring on the shaft, and the stationary carbon <b>brushes</b> rub against it. As the rotor turns, the brushes touch different segments, so the current in each coil reverses right when its arm lines up with a magnet. The attracted arm becomes repelled, and the rotation continues.</p>
+      <p class="note">In the model, red pole shoes are currently north electromagnets and blue are south. Watch them flip as they pass the magnets.</p>
+    </article>
+    <article data-for="dc">
+      <h2>Speed, torque and voltage</h2>
+      <p>A spinning coil also acts as a generator. It produces a <b>back-EMF</b> that opposes the supply and grows with speed:</p>
+      <span class="formula">V = I·R + Kₑ·ω    and    τ = Kₜ·I</span>
+      <p>At stall (ω = 0) there is no back-EMF, so current and torque are at their maximum. As speed rises, the back-EMF eats into the supply voltage, current drops, and the motor settles where its torque matches the load. More voltage means more speed; more load means more current.</p>
+      <p>Reversing the voltage reverses the current in every coil, so the motor spins the other way. Module 3 shows how an H-bridge does that from a single supply.</p>
+    </article>
+    <article data-for="servo" hidden>
+      <h2>A servo is a tiny control system</h2>
+      <p>Inside a hobby servo there is a small DC motor, a gear train, a potentiometer and a control board. The gears reduce speed by roughly 100 to 300 times and multiply torque by the same factor.</p>
+      <p>The potentiometer is attached to the output shaft, so its voltage tells the board the actual angle. The board compares that with the angle you asked for and drives the motor forward or backward until the error is near zero. That is closed-loop position control, the same idea you will tune yourself in module 4.</p>
+    </article>
+    <article data-for="servo" hidden>
+      <h2>Telling a servo where to go</h2>
+      <p>The commanded angle is encoded as the width of a pulse repeated every 20 ms (50 Hz). Around 1.0 ms means one end, 1.5 ms the middle, and 2.0 ms the other end. Many servos accept a wider 0.5 to 2.5 ms range for a full 180°.</p>
+      <p>The servo holds that angle as long as the pulses keep coming, and it resists if you push on the horn. Continuous-rotation servos use the same signal but treat it as a speed command instead.</p>
+      <p class="note">Module 2 lets you generate the pulse and watch the horn follow.</p>
+    </article>
+    <article data-for="stepper" hidden>
+      <h2>Moving in exact steps</h2>
+      <p>A stepper has no brushes. Its coils sit in the stationary stator, and the rotor is a permanent magnet. The driver energizes the coils in a fixed sequence, and the rotor snaps to line up with whichever stator poles are magnetized.</p>
+      <p>Each change in the sequence moves the rotor by one step, so the controller knows the position simply by counting steps. No encoder is needed as long as the load never forces the motor to skip a step.</p>
+      <p class="note">This model uses a 2-pole rotor and 4 stator poles, so a full step is 90°. A typical NEMA 17 motor has a toothed rotor with 50 teeth, giving 200 steps of 1.8° per turn, but the principle is the same.</p>
+    </article>
+    <article data-for="stepper" hidden>
+      <h2>Step sequences</h2>
+      <table>
+        <tr><th>Mode</th><th>What is energized</th><th>Effect</th></tr>
+        <tr><td>Wave</td><td>One coil at a time</td><td>Lowest current, lowest torque</td></tr>
+        <tr><td>Full step</td><td>Two coils at a time</td><td>Rotor sits between poles, about 40% more torque</td></tr>
+        <tr><td>Half step</td><td>Alternates one and two</td><td>Twice the resolution, uneven torque</td></tr>
+      </table>
+      <p>Microstepping drivers go further and set the two coil currents to sine and cosine values, placing the rotor anywhere between steps. Notice the overshoot and ringing after each step in the model: that is why steppers can be noisy and can resonate at certain speeds.</p>
+    </article>
+  </div>
+</section>
+
+<!-- =============== 2 PWM =============== -->
+<section class="mod" id="mod-pwm" aria-labelledby="h-pwm">
+  <header class="mod-head">
+    <div>
+      <h1 id="h-pwm">Pulse-width modulation</h1>
+      <p>A microcontroller pin can only be fully on or fully off. Switching it fast and varying how long it stays on lets you control power as if the voltage were adjustable.</p>
+    </div>
+    <div class="seg" id="pwmTabs" role="group" aria-label="What PWM drives">
+      <button type="button" data-v="led" aria-pressed="true">LED brightness</button>
+      <button type="button" data-v="motor" aria-pressed="false">Motor speed</button>
+      <button type="button" data-v="servo" aria-pressed="false">Servo angle</button>
+    </div>
+  </header>
+  <div class="work">
+    <div class="stage" id="pwmStage">
+      <div style="position:relative"><canvas id="pwmScope" height="230" aria-label="Oscilloscope view of the PWM signal"></canvas><span class="cap" id="pwmScopeCap">Pin 9 voltage</span></div>
+      <div class="plot-wrap"><canvas id="pwmDev" height="300" aria-label="Device driven by PWM"></canvas><span class="cap" id="pwmDevCap">LED</span></div>
+    </div>
+    <aside class="panel">
+      <div class="grp" id="pwmCtl"></div>
+      <div class="grp"><h3>Live readout</h3><div class="readouts" id="pwmRo"></div></div>
+      <div class="grp"><h3>Arduino code for this setting</h3><pre class="code" id="pwmCode"></pre></div>
+    </aside>
+  </div>
+  <div class="learn">
+    <article>
+      <h2>Duty cycle and average voltage</h2>
+      <p>The <b>period</b> T is the time for one on-off cycle, and the frequency is f = 1/T. The <b>duty cycle</b> is the fraction of each period the pin spends high. Whatever is connected only feels the average when it is too slow to follow each pulse:</p>
+      <span class="formula">V_avg = D × V_supply</span>
+      <p>On an Arduino Uno, <code>analogWrite(pin, value)</code> takes 0 to 255, so 128 gives about 50% duty. Pins 5 and 6 run near 980 Hz and the others near 490 Hz.</p>
+    </article>
+    <article>
+      <h2>Why the frequency matters</h2>
+      <p>The load has to smooth the pulses. Your eye averages an LED above roughly 60 to 100 Hz; below that you see flicker. A motor's rotor inertia averages the torque, and its winding inductance smooths the current.</p>
+      <p>Too low a frequency gives speed ripple and jerky motion; try 2 Hz on the motor tab. Too high, and the transistors spend more time switching, which wastes energy as heat. Motor drivers commonly run 15 to 25 kHz, just above hearing, so the motor does not whine.</p>
+    </article>
+    <article>
+      <h2>Servos read the pulse width, not the average</h2>
+      <p>A hobby servo expects one pulse every 20 ms. It ignores the duty cycle as such and measures how long each pulse lasts: 1.0 ms at one end, 1.5 ms at center, 2.0 ms at the other end (often 0.5 to 2.5 ms for a full 180°).</p>
+      <p>That is why you drive a servo with the <code>Servo</code> library instead of <code>analogWrite</code>: the library produces the right 50 Hz timing, and <code>write(angle)</code> converts the angle into a pulse width for you.</p>
+    </article>
+  </div>
+</section>
+
+<!-- =============== 3 H-BRIDGE =============== -->
+<section class="mod" id="mod-hbridge" aria-labelledby="h-hb">
+  <header class="mod-head">
+    <div>
+      <h1 id="h-hb">The H-bridge</h1>
+      <p>Four switches around a motor let one supply push current through it in either direction. Click the switches yourself, or drive them the safe way through the driver's logic pins.</p>
+    </div>
+    <div class="seg" id="hbTabs" role="group" aria-label="Control mode">
+      <button type="button" data-v="manual" aria-pressed="true">Manual switches</button>
+      <button type="button" data-v="driver" aria-pressed="false">Driver pins (L298N style)</button>
+    </div>
+  </header>
+  <div class="work">
+    <div class="stage hb" id="hbStage"><div id="hbSvg"></div></div>
+    <aside class="panel">
+      <div class="grp" id="hbCtl"></div>
+      <div class="grp"><h3>What is happening</h3><div class="status info" id="hbStatus"></div></div>
+      <div class="grp"><h3>Live readout</h3><div class="readouts" id="hbRo"></div></div>
+    </aside>
+  </div>
+  <div class="learn">
+    <article>
+      <h2>Four switch states that matter</h2>
+      <div class="tblwrap"><table>
+        <tr><th>Closed</th><th>Result</th></tr>
+        <tr><td>Q1 + Q4</td><td>Forward: current flows left to right through the motor</td></tr>
+        <tr><td>Q3 + Q2</td><td>Reverse: current flows right to left</td></tr>
+        <tr><td>Q2 + Q4</td><td>Brake: motor terminals shorted, back-EMF stops it quickly</td></tr>
+        <tr><td>None</td><td>Coast: motor disconnected, friction slows it gradually</td></tr>
+        <tr><td>Q1 + Q2 or Q3 + Q4</td><td>Shoot-through: supply shorted to ground. Never do this.</td></tr>
+      </table></div>
+    </article>
+    <article>
+      <h2>Why the diodes are there</h2>
+      <p>A motor winding is an inductor, and current through an inductor cannot stop instantly. When all switches open, the winding forces its current to keep flowing and the voltage spikes until it finds a path.</p>
+      <p>The flyback diodes give it a safe path back to the supply, clamping the spike to about one diode drop above V+. Turn the motor on, then open all switches, and watch the brief diode current. MOSFET bridges often rely on the transistors' built-in body diodes for this.</p>
+    </article>
+    <article>
+      <h2>How driver chips keep you safe</h2>
+      <p>Chips like the L298N, L293D, TB6612 and DRV8833 hide the four switches behind logic inputs. Each IN pin controls one half-bridge: high closes the top switch, low closes the bottom one. The two switches on a side can never be on together, so shoot-through is impossible by design.</p>
+      <p>Speed comes from PWM on the enable pin (ENA). Real drivers also add <b>dead time</b>: a short pause between turning one switch off and the other on, because transistors switch off more slowly than they switch on.</p>
+      <p class="note">The L298N uses bipolar transistors and drops about 2 V or more, so a 12 V supply gives the motor roughly 10 V. Modern MOSFET drivers lose much less.</p>
+    </article>
+  </div>
+</section>
+
+<!-- =============== 4 PID =============== -->
+<section class="mod" id="mod-pid" aria-labelledby="h-pid">
+  <header class="mod-head">
+    <div>
+      <h1 id="h-pid">PID with an encoder</h1>
+      <p>A 12 V DC motor with a 30:1 gearbox and a quadrature encoder. The controller reads encoder counts every sample, computes the error, and sets the motor voltage.</p>
+    </div>
+    <div class="seg" id="pidTabs" role="group" aria-label="What to control">
+      <button type="button" data-v="pos" aria-pressed="true">Position control</button>
+      <button type="button" data-v="speed" aria-pressed="false">Speed control</button>
+    </div>
+  </header>
+  <div class="work">
+    <div class="stage" id="pidStage">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">
+        <div style="position:relative"><canvas id="pidMotor" height="220" aria-label="Motor shaft with encoder"></canvas><span class="cap">Output shaft</span></div>
+        <div style="position:relative;border-left:1px solid var(--line)"><canvas id="pidEnc" height="220" aria-label="Encoder channel A and B signals"></canvas><span class="cap">Encoder channels A and B</span></div>
+      </div>
+      <div class="plot-wrap"><canvas id="pidPlot" height="240" aria-label="Setpoint and measured value plot"></canvas>
+        <div class="legend"><span><i class="dash" style="color:var(--ink)"></i>Setpoint</span><span><i style="background:var(--copper)"></i>Measured</span></div></div>
+      <div class="plot-wrap"><canvas id="pidOut" height="150" aria-label="Controller output plot"></canvas>
+        <div class="legend" id="pidOutLegend"></div></div>
+    </div>
+    <aside class="panel">
+      <div class="grp" id="pidGains"></div>
+      <div class="grp" id="pidSet"></div>
+      <div class="grp"><h3>Step response</h3><div class="readouts" id="pidMetrics"></div><p class="hint" id="pidMetricHint" style="margin:8px 0 0"></p></div>
+      <div class="grp" id="pidPlant"></div>
+    </aside>
+  </div>
+
+  <div class="work" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="panel" id="tuneManual"></div>
+    <div class="panel" id="tuneZN"></div>
+    <div class="panel" id="tuneModel"></div>
+  </div>
+
+  <div class="learn">
+    <article>
+      <h2>What each term does</h2>
+      <span class="formula">u = Kp·e + Ki·∫e dt + Kd·de/dt</span>
+      <p><b>P</b> pushes in proportion to the error now. More Kp is faster and stiffer, but past a point it overshoots and oscillates.</p>
+      <p><b>I</b> adds up past error. It removes the small steady error that friction or a load leaves behind, but too much makes the response slow to settle and causes overshoot.</p>
+      <p><b>D</b> reacts to how fast the error changes. It acts like a damper, braking before the target, which lets you use more Kp. It also amplifies encoder noise.</p>
+    </article>
+    <article>
+      <h2>Reading speed from an encoder</h2>
+      <p>The encoder gives counts, not speed. Speed is the change in counts divided by the sample time. With 11 pulses per motor turn, 4× quadrature decoding and a 30:1 gearbox, one output revolution is 1,320 counts.</p>
+      <p>At a 5 ms sample time, a single count corresponds to about 9 RPM at the output, so the speed reading jumps in 9 RPM steps. That quantization noise is why the speed tab includes a filter, and why the D term becomes useless unless you filter it. Try raising the encoder resolution or the sample time and watch the measured trace.</p>
+    </article>
+    <article>
+      <h2>Practical details real code needs</h2>
+      <p><b>Saturation and windup.</b> The motor can never get more than ±12 V. If the integral keeps growing while the output is clamped, it overshoots badly once the error finally reverses. Anti-windup stops integrating while the output is saturated.</p>
+      <p><b>Derivative on measurement.</b> Taking D from the measured value instead of the error avoids a huge spike, the derivative kick, every time the setpoint jumps.</p>
+      <p><b>Fixed sample time.</b> Run the loop from a timer or check <code>micros()</code>, so dt is constant. Longer sample times add delay, which lowers the gain you can use before oscillation.</p>
+    </article>
+  </div>
+</section>
+
+<!-- =============== 5 BALANCE =============== -->
+<section class="mod" id="mod-balance" aria-labelledby="h-bal">
+  <header class="mod-head">
+    <div>
+      <h1 id="h-bal">Balancing an unstable system</h1>
+      <p>An upright pendulum falls unless the base keeps moving underneath it. The controller measures the tilt and pushes the cart (or spins the wheels) to catch it.</p>
+    </div>
+    <div class="seg" id="balTabs" role="group" aria-label="System">
+      <button type="button" data-v="cart" aria-pressed="true">Cart and pendulum</button>
+      <button type="button" data-v="robot" aria-pressed="false">Two-wheel balancing robot</button>
+    </div>
+  </header>
+  <div class="work">
+    <div class="stage" id="balStage">
+      <div style="position:relative"><canvas id="balView" height="320" aria-label="Pendulum simulation"></canvas><span class="cap" id="balCap">Click the track to set a target position</span></div>
+      <div class="plot-wrap"><canvas id="balPlot" height="180" aria-label="Tilt angle plot"></canvas>
+        <div class="legend"><span><i style="background:var(--copper)"></i>Tilt (°)</span><span><i class="dash" style="color:var(--ink)"></i>Tilt target (°)</span></div></div>
+      <div class="plot-wrap"><canvas id="balPlot2" height="150" aria-label="Position and force plot"></canvas>
+        <div class="legend"><span><i style="background:var(--field)"></i>Position (m)</span><span><i class="dash" style="color:var(--ink)"></i>Target (m)</span><span><i style="background:var(--muted)"></i>Force (scaled)</span></div></div>
+    </div>
+    <aside class="panel">
+      <div class="grp"><div class="status" id="balStatus"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" type="button" id="balPushL">Push left</button>
+          <button class="btn" type="button" id="balPushR">Push right</button>
+          <button class="btn primary" type="button" id="balReset">Reset</button>
+        </div>
+      </div>
+      <div class="grp" id="balInner"></div>
+      <div class="grp" id="balOuter"></div>
+      <div class="grp" id="balPlant"></div>
+    </aside>
+  </div>
+  <div class="learn">
+    <article>
+      <h2>Why it falls, and the gain it takes to stop it</h2>
+      <p>Gravity pulls a tilted pendulum further over, and the pull grows with the tilt. That is positive feedback: the system is unstable on its own. Accelerating the base toward the lean swings the pendulum back up.</p>
+      <p>Near upright, the angle loop needs a proportional gain larger than the total mass times g before it can win against gravity at all. The panel shows that threshold for the current masses. Below it the pendulum always falls; just above it, it falls slowly or oscillates.</p>
+      <p><b>Kd is not optional here.</b> Without damping, P alone produces an oscillation that grows. Try setting Kd to zero.</p>
+    </article>
+    <article>
+      <h2>Tuning steps that work</h2>
+      <ol>
+        <li>Turn the position loop off. Set Ki and Kd to zero.</li>
+        <li>Raise Kp until the pendulum stops falling and starts swinging back and forth.</li>
+        <li>Add Kd until the swinging dies out within a second. Then raise Kp a bit more and repeat.</li>
+        <li>Notice the cart drifts away even though the pendulum is upright. The angle loop does not care where the cart is.</li>
+        <li>Enable the position loop with a small Kp and some Kd. Keep it much slower than the angle loop.</li>
+        <li>Push the pendulum and move the target to check that it recovers.</li>
+      </ol>
+    </article>
+    <article>
+      <h2>Cascade control and the wrong-way move</h2>
+      <p>The position loop does not push the cart directly. It chooses a small <b>tilt target</b>, and the fast angle loop tracks that tilt. To drive right, the pendulum must first lean right, which means the cart briefly moves left to tip it. Watch the cart step backward before it travels to a new target. Control engineers call this non-minimum-phase behavior.</p>
+      <p>A balancing robot is the same problem: the wheels are the cart and the body is the pendulum. Real robots measure tilt with an IMU (accelerometer plus gyroscope, fused with a complementary or Kalman filter), and they use wheel encoders for the position loop. Full state-feedback methods like LQR compute all four gains at once.</p>
+    </article>
+  </div>
+</section>
+</main>
+</div>
+<script>
+"use strict";
+/* ================= common utilities ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const TAU = Math.PI * 2;
+
+/* theme colors from CSS variables, refreshed when the scheme changes */
+const C = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ["paper","surface","stage","ink","muted","line","grid","copper","field","north","ok","warn","amber"])
+    C[k] = cs.getPropertyValue("--" + k).trim();
+  document.dispatchEvent(new Event("themechange"));
+}
+const mq = matchMedia("(prefers-color-scheme: dark)");
+mq.addEventListener ? mq.addEventListener("change", readTheme) : mq.addListener(readTheme);
+$("#themeBtn").addEventListener("click", () => {
+  const root = document.documentElement;
+  const cur = root.dataset.theme || (mq.matches ? "dark" : "light");
+  root.dataset.theme = cur === "dark" ? "light" : "dark";
+  try { localStorage.setItem("mcl-theme", root.dataset.theme); } catch (e) {}
+  readTheme();
+});
+try { const t = localStorage.getItem("mcl-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+
+/* number formatting */
+function fmt(v, d = 0) { if (!isFinite(v)) return "–"; return (Math.abs(v) < 1e-9 ? 0 : v).toFixed(d); }
+
+/* ---------- control builders ---------- */
+function heading(parent, text) { const h = document.createElement("h3"); h.textContent = text; parent.appendChild(h); return h; }
+
+/* slider with optional log scale and editable number box */
+function slider(parent, o) {
+  const wrap = document.createElement("div"); wrap.className = "ctl";
+  const id = "s_" + Math.random().toString(36).slice(2, 8);
+  const lab = document.createElement("label"); lab.htmlFor = id;
+  const name = document.createElement("span"); name.innerHTML = o.label;
+  lab.appendChild(name);
+  let out;
+  if (o.editable) {
+    out = document.createElement("input"); out.type = "number"; out.className = "num"; out.step = "any";
+    out.setAttribute("aria-label", o.label.replace(/<[^>]+>/g, ""));
+  } else out = document.createElement("output");
+  lab.appendChild(out);
+  const r = document.createElement("input"); r.type = "range"; r.id = id;
+  const log = !!o.log;
+  const toPos = v => log ? Math.log(v / o.min) / Math.log(o.max / o.min) * 1000 : v;
+  const fromPos = p => log ? o.min * Math.pow(o.max / o.min, p / 1000) : p;
+  if (log) { r.min = 0; r.max = 1000; r.step = 1; } else { r.min = o.min; r.max = o.max; r.step = o.step || 1; }
+  wrap.appendChild(lab); wrap.appendChild(r); parent.appendChild(wrap);
+  let value = o.value;
+  const show = () => {
+    const txt = o.fmt ? o.fmt(value) : fmt(value, o.dec || 0);
+    if (o.editable) out.value = txt; else out.innerHTML = txt + (o.unit ? `<small>${o.unit}</small>` : "");
+    const p = (toPos(value) - r.min) / (r.max - r.min) * 100;
+    r.style.setProperty("--p", clamp(p, 0, 100) + "%");
+  };
+  const api = {
+    get value() { return value; },
+    set(v, silent) { value = v; r.value = toPos(clamp(v, o.min, o.max)); show(); if (!silent && o.onInput) o.onInput(value); },
+    el: wrap, range: r
+  };
+  r.addEventListener("input", () => {
+    let v = fromPos(+r.value);
+    if (log) { const mag = Math.pow(10, Math.floor(Math.log10(v)) - 1); v = Math.round(v / mag) * mag; }
+    value = v; show(); o.onInput && o.onInput(value);
+  });
+  if (o.editable) out.addEventListener("change", () => {
+    const v = parseFloat(out.value); if (isFinite(v) && v >= 0) api.set(Math.min(v, o.max * 10));
+    else show();
+  });
+  api.set(value, true);
+  return api;
+}
+function checkbox(parent, label, checked, on) {
+  const l = document.createElement("label"); l.className = "chk";
+  const c = document.createElement("input"); c.type = "checkbox"; c.checked = checked;
+  l.appendChild(c); l.appendChild(document.createTextNode(" " + label)); parent.appendChild(l);
+  c.addEventListener("change", () => on(c.checked)); return c;
+}
+function button(parent, label, on, cls = "") {
+  const b = document.createElement("button"); b.type = "button"; b.className = "btn " + cls; b.innerHTML = label;
+  b.addEventListener("click", on); parent.appendChild(b); return b;
+}
+function row(parent) { const d = document.createElement("div"); d.className = "row"; parent.appendChild(d); return d; }
+function segmented(el, on) {
+  const btns = $$("button", el);
+  const set = v => { btns.forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v)); };
+  btns.forEach(b => b.addEventListener("click", () => { set(b.dataset.v); on(b.dataset.v); }));
+  return { set };
+}
+function makeSeg(parent, opts, value, on, small = true) {
+  const d = document.createElement("div"); d.className = "seg" + (small ? " small" : ""); d.setAttribute("role", "group");
+  for (const [v, l] of opts) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = v; b.textContent = l; b.setAttribute("aria-pressed", v === value); d.appendChild(b); }
+  parent.appendChild(d); return segmented(d, on);
+}
+/* readout tiles */
+function readouts(el, defs) {
+  el.innerHTML = "";
+  const map = {};
+  for (const [k, label, unit] of defs) {
+    const d = document.createElement("div"); d.className = "ro";
+    d.innerHTML = `<span>${label}</span><b><em style="font-style:normal">–</em>${unit ? `<small>${unit}</small>` : ""}</b>`;
+    el.appendChild(d); map[k] = $("em", d);
+  }
+  return (k, v) => { if (map[k] && map[k].textContent !== String(v)) map[k].textContent = v; };
+}
+
+/* ---------- canvas helpers ---------- */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cv.clientWidth || cv.parentElement.clientWidth;
+  const h = +cv.getAttribute("height") > 0 && !cv.dataset.h ? (cv.dataset.h = cv.getAttribute("height")) : cv.dataset.h;
+  cv.style.height = h + "px";
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h: +h };
+}
+
+/* scrolling time plot */
+class Plot {
+  constructor(cv, o) { this.cv = cv; this.o = Object.assign({ window: 4, yMin: -1, yMax: 1, auto: false, unit: "", traces: [] }, o); this.data = this.o.traces.map(() => []); this.t = 0; }
+  push(t, vals) {
+    this.t = t;
+    vals.forEach((v, i) => this.data[i].push(t, v));
+    const cut = t - this.o.window - 0.1;
+    for (const d of this.data) { let k = 0; while (k < d.length && d[k] < cut) k += 2; if (k > 400) d.splice(0, k); }
+  }
+  clear() { this.data = this.o.traces.map(() => []); }
+  draw() {
+    const { ctx, w, h } = fitCanvas(this.cv);
+    const o = this.o, padL = 46, padR = 12, padT = 26, padB = 20;
+    ctx.clearRect(0, 0, w, h);
+    let lo = o.yMin, hi = o.yMax;
+    if (o.auto) {
+      lo = Infinity; hi = -Infinity;
+      const t0 = this.t - o.window;
+      this.data.forEach((d, i) => { if (o.traces[i].noScale) return; for (let k = 0; k < d.length; k += 2) if (d[k] >= t0 && isFinite(d[k + 1])) { lo = Math.min(lo, d[k + 1]); hi = Math.max(hi, d[k + 1]); } });
+      if (!isFinite(lo)) { lo = o.yMin; hi = o.yMax; }
+      if (o.includeZero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+      const span = Math.max(hi - lo, o.minSpan || 1); const mid = (hi + lo) / 2;
+      lo = mid - span * 0.6; hi = mid + span * 0.6;
+    }
+    const X = t => padL + (t - (this.t - o.window)) / o.window * (w - padL - padR);
+    const Y = v => padT + (hi - v) / (hi - lo) * (h - padT - padB);
+    /* grid */
+    ctx.font = "12px Barlow, sans-serif"; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+    const step = niceStep((hi - lo) / 4);
+    ctx.strokeStyle = C.line; ctx.fillStyle = C.muted; ctx.lineWidth = 1;
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      const y = Math.round(Y(v)) + .5; ctx.globalAlpha = Math.abs(v) < step * 1e-6 ? 1 : .55;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillText(+v.toFixed(6) + "", padL - 6, y);
+    }
+    ctx.textAlign = "left"; ctx.fillText(o.unit, 6, 12);
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    for (let s = Math.max(0, Math.ceil(this.t - o.window)); s <= this.t; s++) { const x = X(s); if (x > padL + 10) ctx.fillText(s + " s", x, h - 5); }
+    /* traces */
+    ctx.save(); ctx.beginPath(); ctx.rect(padL, padT - 4, w - padL - padR, h - padT - padB + 8); ctx.clip();
+    this.data.forEach((d, i) => {
+      const tr = o.traces[i]; if (tr.hidden) return;
+      ctx.strokeStyle = C[tr.color] || tr.color; ctx.lineWidth = tr.width || 2; ctx.setLineDash(tr.dash ? [5, 4] : []);
+      ctx.globalAlpha = tr.alpha || 1;
+      ctx.beginPath(); let started = false; const t0 = this.t - o.window - 0.05;
+      for (let k = 0; k < d.length; k += 2) {
+        if (d[k] < t0) continue;
+        if (!isFinite(d[k + 1])) { started = false; continue; }
+        const x = X(d[k]), y = Y(d[k + 1]);
+        if (!started) { ctx.moveTo(x, y); started = true; }
+        else if (tr.step) { ctx.lineTo(x, Y(d[k - 1])); ctx.lineTo(x, y); } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    ctx.restore(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+}
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); const n = raw / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; }
+
+/* ---------- module router + main loop ---------- */
+const MODS = {};
+let active = null, lastT = performance.now();
+function activate(name) {
+  if (!MODS[name]) name = "motors";
+  $$(".mod").forEach(s => s.classList.toggle("active", s.id === "mod-" + name));
+  $$(".steps a").forEach(a => { if (a.dataset.mod === name) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  if (active && MODS[active].hide) MODS[active].hide();
+  active = name;
+  const m = MODS[name];
+  if (!m.inited) { m.init(); m.inited = true; }
+  m.show && m.show();
+  lastT = performance.now();
+}
+function route() { activate((location.hash || "#motors").slice(1)); }
+window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
+function loop(now) {
+  const dt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
+  if (active && MODS[active].tick && !document.hidden) MODS[active].tick(dt);
+  requestAnimationFrame(loop);
+}
+/* ================= 1. MOTORS IN 3D ================= */
+MODS.motors = (() => {
+  let renderer, scene, camera, cv, stage, labelsEl, infoEl, ray, ptr;
+  const orbit = { r: 11, th: 0.75, ph: 1.12, target: null, zoom: 1 };
+  const CAM = { dc: { r: 11, th: 0.75, ph: 1.12, ty: 0, tyEx: 0, rEx: 3 }, servo: { r: 7.5, th: 0.6, ph: 1.08, ty: 0.15, tyEx: 1.0, rEx: 6.5 }, stepper: { r: 8.2, th: 1.2, ph: 1.25, ty: 0, tyEx: 0, rEx: 3 } };
+  let kind = "dc", models = {}, explode = 0, playback = 0.35, showLabels = true, showField = true, showCase = true;
+  let ro, ctlDC, ctlServo, ctlStep;
+  const S = { // simulation state
+    dc: { V: 6, load: 5, ang: 0, w: 0 },
+    servo: { target: 90, ang: 30, motorAng: 0, drive: 0 },
+    step: { mode: "full", idx: 0, count: 0, rate: 2, auto: true, dir: 1, acc: 0, ang: -Math.PI / 4, w: 0, iA: 1, iB: 1 }
+  };
+  const SEQ = {
+    wave: [[1, 0], [0, 1], [-1, 0], [0, -1]],
+    full: [[1, 1], [-1, 1], [-1, -1], [1, -1]],
+    half: [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]
+  };
+
+  /* ---------- materials ---------- */
+  let M;
+  function mats() {
+    const std = (c, m, r, extra = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: c, metalness: m, roughness: r }, extra));
+    M = {
+      copper: std(0xb8692e, 0.65, 0.33), steel: std(0xb3bac1, 0.85, 0.28), iron: std(0x737b83, 0.55, 0.5),
+      ironA: std(0x737b83, 0.55, 0.5), magN: std(0xc8463a, 0.2, 0.55), magS: std(0x2f62c9, 0.2, 0.55),
+      carbon: std(0x2c2c2c, 0.1, 0.9), dark: std(0x32383e, 0.2, 0.6), white: std(0xeeeeea, 0.05, 0.5),
+      pcb: std(0x1d6a45, 0.1, 0.6), chip: std(0x1a1a1a, 0.2, 0.5), red: std(0xc0392b, 0.1, 0.6), black: std(0x222222, 0.1, 0.6),
+      orange: std(0xe08a1e, 0.1, 0.6), gear: std(0xd9c27a, 0.55, 0.38), brown: std(0x6b4423, 0.1, 0.6), brass: std(0xc9a64a, 0.8, 0.3),
+      glass: new THREE.MeshStandardMaterial({ color: 0xa9bccc, transparent: true, opacity: 0.13, roughness: 0.1, metalness: 0.1, depthWrite: false, side: THREE.DoubleSide }),
+      glassDark: new THREE.MeshStandardMaterial({ color: 0x2e3a46, transparent: true, opacity: 0.2, roughness: 0.2, depthWrite: false, side: THREE.DoubleSide }),
+      edge: new THREE.LineBasicMaterial({ color: 0x8796a3, transparent: true, opacity: 0.55 }),
+      field: new THREE.MeshBasicMaterial({ color: 0x4f86e8, transparent: true, opacity: 0.85 })
+    };
+  }
+  /* ---------- geometry helpers ---------- */
+  function arcShell(rIn, rOut, a0, a1, depth, seg = 32) {
+    const s = new THREE.Shape();
+    s.absarc(0, 0, rOut, a0, a1, false);
+    s.lineTo(rIn * Math.cos(a1), rIn * Math.sin(a1));
+    s.absarc(0, 0, rIn, a1, a0, true);
+    s.lineTo(rOut * Math.cos(a0), rOut * Math.sin(a0));
+    const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: seg });
+    g.translate(0, 0, -depth / 2); return g;
+  }
+  function ringShell(rIn, rOut, depth) {
+    const s = new THREE.Shape(); s.absarc(0, 0, rOut, 0, TAU, false);
+    const h = new THREE.Path(); h.absarc(0, 0, rIn, 0, TAU, true); s.holes.push(h);
+    const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 48 }); g.translate(0, 0, -depth / 2); return g;
+  }
+  function roundRect(w, h, r) {
+    const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r);
+    s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s;
+  }
+  /* coil wound around a radial arm: loop in tangential(x)/axial plane, thickness along +Y (radial) */
+  function coilGeom(w, h, wall, thick) {
+    const s = roundRect(w, h, Math.min(w, h) * 0.3);
+    const hole = roundRect(w - wall * 2, h - wall * 2, Math.min(w, h) * 0.18); s.holes.push(new THREE.Path(hole.getPoints(12)));
+    const g = new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2, curveSegments: 8 });
+    g.rotateX(-Math.PI / 2); return g; // shape Y -> -Z (axial), extrusion -> +Y (radial)
+  }
+  function gearGeom(teeth, r, h) {
+    const s = new THREE.Shape(), rr = r - 0.035, rt = r + 0.03;
+    for (let i = 0; i < teeth; i++) {
+      const a = i / teeth * TAU, d = TAU / teeth;
+      const pts = [[rr, a], [rt, a + d * 0.18], [rt, a + d * 0.45], [rr, a + d * 0.62]];
+      pts.forEach(([rad, an], k) => { const x = rad * Math.cos(an), y = rad * Math.sin(an); (i === 0 && k === 0) ? s.moveTo(x, y) : s.lineTo(x, y); });
+    }
+    s.closePath();
+    const hole = new THREE.Path(); hole.absarc(0, 0, 0.035, 0, TAU, true); s.holes.push(hole);
+    const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 4 });
+    g.rotateX(-Math.PI / 2); g.translate(0, -h / 2, 0); return g; // axis along Y
+  }
+  const cyl = (r, h, m, seg = 32) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m);
+  const box = (x, y, z, m) => new THREE.Mesh(new THREE.BoxGeometry(x, y, z), m);
+  const mesh = (g, m) => new THREE.Mesh(g, m);
+  function edges(g, parent) { const l = new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), M.edge); parent.add(l); return l; }
+
+  /* part registry for a model */
+  function newModel(rootRot) {
+    const root = new THREE.Group(); if (rootRot) root.rotation.copy(rootRot);
+    return { root, parts: [], field: null, caseParts: [] };
+  }
+  function addPart(model, obj, base, ex, name, desc, labelAt) {
+    obj.position.copy(base); model.root.add(obj);
+    obj.traverse(o => { if (o.isMesh) o.userData.part = name; });
+    const p = { obj, base: base.clone(), ex, name, desc, labelAt: labelAt || new THREE.Vector3() };
+    model.parts.push(p); return p;
+  }
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+  /* ---------- brushed DC motor (axis = local Z, rotated to world X) ---------- */
+  function buildDC() {
+    const m = newModel(new THREE.Euler(0, Math.PI / 2, 0));
+    // housing
+    const hous = new THREE.Group();
+    const canG = new THREE.CylinderGeometry(1.62, 1.62, 3.9, 56, 1, true); canG.rotateX(Math.PI / 2); canG.translate(0, 0, 0.35);
+    hous.add(mesh(canG, M.glass)); edges(canG, hous);
+    const backG = new THREE.CircleGeometry(1.62, 56); const back = mesh(backG, M.glass); back.position.z = -1.6; back.rotation.y = Math.PI; hous.add(back);
+    const bearing = mesh(ringShell(0.1, 0.24, 0.2), M.brass); bearing.position.z = -1.6; hous.add(bearing);
+    addPart(m, hous, V3(0, 0, 0), V3(0, 0, -4.6), "Steel housing (can)", "Holds everything together and is part of the magnetic circuit: it carries the magnets' flux around the outside, from one magnet to the other.", V3(0, 1.62, -1.2));
+    m.caseParts.push(hous);
+    // magnets
+    const nG = arcShell(1.2, 1.52, Math.PI / 6, Math.PI * 5 / 6, 2.6), sG = arcShell(1.2, 1.52, Math.PI * 7 / 6, Math.PI * 11 / 6, 2.6);
+    addPart(m, mesh(nG, M.magN), V3(0, 0, -0.1), V3(0, 1.4, 0), "Permanent magnet (north)", "A curved ceramic or neodymium magnet glued to the inside of the can. With the south magnet opposite, it creates a steady magnetic field across the rotor.", V3(0, 1.38, 0));
+    addPart(m, mesh(sG, M.magS), V3(0, 0, -0.1), V3(0, -1.4, 0), "Permanent magnet (south)", "The second stator magnet. Field lines run from the north magnet, through the rotor's iron, into this one, then back around through the steel can.", V3(0, -1.38, 0));
+    // rotor
+    const rotor = new THREE.Group();
+    const hub = cyl(0.36, 2.4, M.iron); hub.rotation.x = Math.PI / 2; rotor.add(hub);
+    const shaft = cyl(0.1, 5.4, M.steel, 16); shaft.rotation.x = Math.PI / 2; shaft.position.z = 0.6; rotor.add(shaft);
+    m.shoes = []; m.coils = [];
+    for (let k = 0; k < 3; k++) {
+      const arm = new THREE.Group(); arm.rotation.z = Math.PI / 2 + k * TAU / 3 - Math.PI / 2; // +Y radial at angle (90+120k)
+      arm.rotation.z = k * TAU / 3; // arm +Y points at 90°+120k
+      const stem = box(0.28, 0.62, 2.3, M.iron); stem.position.y = 0.62; arm.add(stem);
+      const shoeMat = M.iron.clone(); const shoe = mesh(arcShell(0.93, 1.1, Math.PI / 2 - 0.72, Math.PI / 2 + 0.72, 2.3), shoeMat); arm.add(shoe);
+      const coilMat = M.copper.clone(); const coil = mesh(coilGeom(0.62, 2.0, 0.15, 0.36), coilMat); coil.position.y = 0.45; arm.add(coil);
+      rotor.add(arm); m.shoes.push(shoeMat); m.coils.push(coilMat);
+    }
+    m.rotor = addPart(m, rotor, V3(0, 0, 0), V3(0, 0, 0), "Rotor (armature)", "Iron arms wound with copper coils, fixed to the shaft. When current flows, each arm becomes an electromagnet; red means north, blue means south. Three arms ensure the motor can start from any position.", V3(0, 1.0, 0.6));
+    // commutator (rotates with rotor)
+    const comm = new THREE.Group();
+    const core = cyl(0.19, 0.55, M.dark); core.rotation.x = Math.PI / 2; comm.add(core);
+    for (let k = 0; k < 3; k++) { const c = k * TAU / 3 + Math.PI / 2 + Math.PI / 3; comm.add(mesh(arcShell(0.2, 0.34, c - 0.92, c + 0.92, 0.5), M.copper)); }
+    m.comm = addPart(m, comm, V3(0, 0, 1.85), V3(0, 0, 1.6), "Commutator", "A copper ring split into insulated segments, one pair of segments per coil. It turns with the shaft and acts as a rotary switch that reverses each coil's current at the right moment.", V3(0, 0.34, 0));
+    // brushes
+    const mkBrush = (sx, wireMat) => {
+      const g = new THREE.Group();
+      const b = box(0.32, 0.24, 0.3, M.carbon); b.position.x = sx * 0.5; g.add(b);
+      const spring = cyl(0.06, 0.34, M.brass, 10); spring.rotation.z = Math.PI / 2; spring.position.x = sx * 0.83; g.add(spring);
+      const w = cyl(0.035, 0.62, wireMat, 8); w.rotation.x = Math.PI / 2; w.position.set(sx * 0.95, 0, 0.3); g.add(w);
+      return g;
+    };
+    addPart(m, mkBrush(1, M.red), V3(0, 0, 1.85), V3(0.9, 0, 2.3), "Carbon brush (+)", "A spring-loaded graphite block pressing on the commutator. It feeds supply current into whichever coil segments it touches. Brushes wear out, which is why brushless motors exist.", V3(0.55, 0.18, 0));
+    addPart(m, mkBrush(-1, M.black), V3(0, 0, 1.85), V3(-0.9, 0, 2.3), "Carbon brush (−)", "The return path. Together, the two brushes and the commutator decide which coils are energized and in which direction.", V3(-0.55, 0.18, 0));
+    // end cap
+    const cap = new THREE.Group();
+    const capG = new THREE.CircleGeometry(1.62, 56); cap.add(mesh(capG, M.glass)); edges(new THREE.RingGeometry(1.6, 1.62, 56), cap);
+    const b2 = mesh(ringShell(0.1, 0.24, 0.2), M.brass); cap.add(b2);
+    const t1 = box(0.16, 0.34, 0.05, M.brass); t1.position.set(0.95, 0, 0.12); cap.add(t1);
+    const t2 = t1.clone(); t2.position.x = -0.95; cap.add(t2);
+    addPart(m, cap, V3(0, 0, 2.3), V3(0, 0, 4.0), "End cap and terminals", "Plastic end cap that holds the brushes and the front bearing. The two solder tabs are where you connect the supply or the motor driver.", V3(0, 1.3, 0));
+    m.caseParts.push(cap);
+    // field arrows (N at +Y to S at -Y)
+    const fg = new THREE.Group();
+    for (const x of [-0.75, 0, 0.75]) for (const z of [-0.8, 0.6]) {
+      const shaftL = cyl(0.025, 2.0, M.field, 6); shaftL.position.set(x, 0.1, z); fg.add(shaftL);
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 10), M.field); head.rotation.x = Math.PI; head.position.set(x, -1.0, z); fg.add(head);
+    }
+    m.root.add(fg); m.field = fg;
+    return m;
+  }
+
+  /* ---------- hobby servo (axis = Y) ---------- */
+  function buildServo() {
+    const m = newModel(null);
+    m.root.position.y = -0.4;
+    const body = new THREE.Group();
+    const bG = new THREE.BoxGeometry(2.1, 1.85, 1.34); bG.translate(0, -0.07, 0);
+    body.add(mesh(bG, M.glassDark)); edges(bG, body);
+    const tabG = new THREE.BoxGeometry(3.0, 0.1, 1.34); const tab = mesh(tabG, M.glassDark); tab.position.y = 0.5; body.add(tab); edges(tabG, tab);
+    for (const sx of [-1.3, 1.3]) { const h = cyl(0.09, 0.12, M.dark, 12); h.position.set(sx, 0.5, 0); body.add(h); }
+    addPart(m, body, V3(0, 0, 0), V3(0, 0, 0), "Case with mounting tabs", "The plastic housing. The tabs with holes let you screw the servo to a bracket or a robot frame.", V3(-1.35, 0.6, 0));
+    m.caseParts.push(body);
+    const lidG = new THREE.BoxGeometry(2.1, 0.3, 1.34); const lid = new THREE.Group(); lid.add(mesh(lidG, M.glassDark)); edges(lidG, lid);
+    addPart(m, lid, V3(0, 1.0, 0), V3(0, 3.2, 0), "Top cover", "Holds the top bearings for the gear shafts. Remove it and you find the gear train.", V3(-0.7, 0.16, 0));
+    m.caseParts.push(lid);
+    // horn on output shaft
+    const horn = new THREE.Group();
+    const hub = cyl(0.2, 0.22, M.white, 24); horn.add(hub);
+    const armG = new THREE.BoxGeometry(1.5, 0.08, 0.26); armG.translate(0.55, 0.06, 0); horn.add(mesh(armG, M.white));
+    for (let i = 0; i < 4; i++) { const hl = cyl(0.03, 0.1, M.dark, 8); hl.position.set(0.55 + i * 0.22, 0.08, 0); horn.add(hl); }
+    m.horn = addPart(m, horn, V3(0.45, 1.33, 0), V3(0, 3.9, 0), "Output horn", "The arm you attach linkages to. It sits on the splined output shaft and turns only through about 180°.", V3(0.9, 0.12, 0));
+    // gears
+    const gear = (teeth, r, h, mat) => mesh(gearGeom(teeth, r, h), mat);
+    const gw = M.gear;
+    const out = new THREE.Group(); out.add(gear(40, 0.4, 0.12, gw)); const os = cyl(0.05, 0.6, M.steel, 12); os.position.y = 0.3; out.add(os);
+    m.gOut = addPart(m, out, V3(0.45, 0.7, 0), V3(0, 2.7, 0), "Output gear", "The last and largest gear, on the output shaft. The potentiometer underneath is coupled to it, so it always knows the real output angle.", V3(0.3, 0.1, -0.3));
+    const g2 = new THREE.Group(); const g2b = gear(40, 0.4, 0.1, gw); g2b.position.y = 0; g2.add(g2b); const g2s = gear(8, 0.08, 0.14, gw); g2s.position.y = 0.17; g2.add(g2s);
+    m.g2 = addPart(m, g2, V3(0, 0.53, 0.17), V3(0, 2.05, 0), "Compound gear 2", "Each compound gear is a large gear and a small pinion molded together. Large-to-small stages multiply the reduction: 5 × 5 × 5 = 125 here.", V3(-0.3, 0, 0.35));
+    const g1 = new THREE.Group(); g1.add(gear(40, 0.4, 0.1, gw)); const g1s = gear(8, 0.08, 0.14, gw); g1s.position.y = 0.17; g1.add(g1s);
+    m.g1 = addPart(m, g1, V3(-0.38, 0.33, -0.12), V3(0, 1.4, 0), "Compound gear 1", "First reduction stage, driven by the motor pinion. Gears trade speed for torque: the output turns 125 times slower but with roughly 125 times the torque, minus friction losses.", V3(-0.2, 0, -0.42));
+    // motor + pinion
+    const mot = new THREE.Group();
+    const mc = cyl(0.28, 0.95, M.steel, 24); mc.position.y = -0.4; mot.add(mc);
+    const pin = gear(8, 0.08, 0.14, M.brass); pin.position.y = 0.33; mot.add(pin); m.pinion = pin;
+    const ms = cyl(0.03, 0.4, M.steel, 8); ms.position.y = 0.15; mot.add(ms);
+    addPart(m, mot, V3(-0.62, 0, 0.3), V3(-1.5, -0.2, 0.5), "DC motor and pinion", "A small brushed DC motor spinning thousands of RPM. The brass pinion on its shaft drives the gear train.", V3(0, -0.4, 0.3));
+    // potentiometer
+    const pot = new THREE.Group(); const pc = cyl(0.25, 0.28, M.dark, 24); pot.add(pc);
+    const wiper = box(0.04, 0.03, 0.2, M.brass); wiper.position.set(0, 0.15, 0.1); pot.add(wiper); m.wiper = wiper;
+    const pins = cyl(0.03, 0.4, M.brass, 6); pins.position.set(0, -0.3, 0); pot.add(pins);
+    addPart(m, pot, V3(0.45, 0.25, 0), V3(1.2, 0.0, 0.6), "Potentiometer (feedback sensor)", "A variable resistor turned by the output shaft. Its voltage is proportional to the output angle, and the control board compares it with the commanded angle.", V3(0.3, 0.1, 0));
+    // pcb
+    const pcb = new THREE.Group(); pcb.add(box(1.85, 0.06, 1.15, M.pcb));
+    const chip = box(0.5, 0.08, 0.4, M.chip); chip.position.set(0.3, 0.07, 0); pcb.add(chip);
+    const chip2 = box(0.3, 0.08, 0.3, M.chip); chip2.position.set(-0.4, 0.07, -0.2); pcb.add(chip2);
+    [[M.brown, 0.18], [M.red, 0], [M.orange, -0.18]].forEach(([mt, z]) => { const w = cyl(0.05, 1.3, mt, 8); w.rotation.z = Math.PI / 2; w.position.set(-1.45, 0.05, z); pcb.add(w); });
+    addPart(m, pcb, V3(0, -0.88, 0), V3(0, -1.3, 0), "Control board and wires", "Reads the pulse on the signal wire (orange), compares it with the potentiometer, and drives the motor through a tiny H-bridge. Brown is ground, red is supply (usually 4.8 to 6 V).", V3(0.6, 0.08, 0.3));
+    return m;
+  }
+
+  /* ---------- stepper (axis = local Z, rotated to world X) ---------- */
+  function buildStepper() {
+    const m = newModel(new THREE.Euler(0, Math.PI / 2, 0));
+    const hous = new THREE.Group(); const hG = new THREE.BoxGeometry(2.7, 2.7, 2.2);
+    hous.add(mesh(hG, M.glass)); edges(hG, hous);
+    addPart(m, hous, V3(0, 0, 0), V3(0, 0, -4.2), "Housing (NEMA style)", "Square aluminium end bells and a steel stator stack. NEMA sizes (17, 23…) describe the faceplate width, not the power.", V3(1.35, 1.35, 0));
+    m.caseParts.push(hous);
+    const stator = new THREE.Group();
+    stator.add(mesh(ringShell(1.0, 1.2, 1.8), M.iron));
+    m.poleMats = []; m.statCoils = [];
+    const names = ["A", "B", "A'", "B'"];
+    const angles = [Math.PI / 2, 0, -Math.PI / 2, Math.PI];
+    for (let k = 0; k < 4; k++) {
+      const arm = new THREE.Group(); arm.rotation.z = angles[k] - Math.PI / 2;
+      const stem = box(0.3, 0.5, 1.7, M.iron); stem.position.y = 0.78; arm.add(stem);
+      const pm = M.iron.clone(); arm.add(mesh(arcShell(0.53, 0.62, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 1.7), pm));
+      const cm = M.copper.clone(); const coil = mesh(coilGeom(0.62, 1.95, 0.15, 0.32), cm); coil.position.y = 0.66; arm.add(coil);
+      stator.add(arm); m.poleMats.push(pm); m.statCoils.push(cm);
+    }
+    addPart(m, stator, V3(0, 0, 0), V3(0, 2.6, 0), "Stator with coils A and B", "Four iron poles. Opposite poles belong to the same phase: A and A' share one coil circuit, B and B' the other. Energizing a phase makes one of its poles north and the opposite one south.", V3(-0.9, 0.9, -0.9));
+    const rotor = new THREE.Group();
+    rotor.add(mesh(arcShell(0.1, 0.46, -Math.PI / 2, Math.PI / 2, 1.6), M.magN));
+    rotor.add(mesh(arcShell(0.1, 0.46, Math.PI / 2, Math.PI * 1.5, 1.6), M.magS));
+    const sh = cyl(0.1, 4.2, M.steel, 16); sh.rotation.x = Math.PI / 2; sh.position.z = -0.9; rotor.add(sh);
+    m.rotor = addPart(m, rotor, V3(0, 0, 0), V3(0, 0, 2.4), "Permanent-magnet rotor", "The rotor's north half (red) is pulled toward whichever stator pole is currently south. Change which coils are on, and it snaps to the new position.", V3(0.75, -0.75, 1.0));
+    m.poleLabels = names.map((n, k) => ({ n, a: angles[k] }));
+    return m;
+  }
+
+  /* ---------- scene + orbit ---------- */
+  function init() {
+    cv = $("#m3d"); stage = $("#m3dStage"); labelsEl = $("#m3dLabels"); infoEl = $("#m3dInfo");
+    buildPanel();
+    if (!window.THREE) { infoEl.innerHTML = "<b>3D view unavailable</b>The 3D library could not load. Check your internet connection and reload the page."; return; }
+    try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); }
+    catch (e) { infoEl.innerHTML = "<b>3D view unavailable</b>Your browser has WebGL turned off, so the 3D model cannot be drawn. The controls and explanations still work."; return; }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setClearColor(0x000000, 0);
+    if ("outputEncoding" in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    orbit.target = new THREE.Vector3(0, 0, 0);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x50606e, 0.95));
+    const d1 = new THREE.DirectionalLight(0xffffff, 0.95); d1.position.set(5, 9, 7); scene.add(d1);
+    const d2 = new THREE.DirectionalLight(0xbcd0ff, 0.4); d2.position.set(-7, -3, -5); scene.add(d2);
+    mats();
+    models.dc = buildDC(); models.servo = buildServo(); models.stepper = buildStepper();
+    for (const k in models) { scene.add(models[k].root); models[k].root.visible = k === kind; makeLabels(models[k]); }
+    ray = new THREE.Raycaster(); ptr = new THREE.Vector2();
+    // orbit controls
+    let drag = null, moved = 0, pinch = null;
+    cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; moved = 0; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener("pointermove", e => {
+      if (!drag || pinch) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved += Math.abs(dx) + Math.abs(dy);
+      orbit.th -= dx * 0.008; orbit.ph = clamp(orbit.ph - dy * 0.008, 0.15, Math.PI - 0.15); drag = { x: e.clientX, y: e.clientY };
+    });
+    cv.addEventListener("pointerup", e => { if (drag && moved < 5) pick(e); drag = null; });
+    cv.addEventListener("wheel", e => { e.preventDefault(); orbit.zoom = clamp(orbit.zoom * (1 + Math.sign(e.deltaY) * 0.08), 0.4, 2.2); }, { passive: false });
+    cv.addEventListener("touchstart", e => { if (e.touches.length === 2) pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); }, { passive: true });
+    cv.addEventListener("touchmove", e => { if (e.touches.length === 2 && pinch) { const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); orbit.zoom = clamp(orbit.zoom * pinch / d, 0.4, 2.2); pinch = d; } }, { passive: true });
+    cv.addEventListener("touchend", e => { if (e.touches.length < 2) pinch = null; });
+    cv.style.touchAction = "none";
+    new ResizeObserver(resize).observe(stage);
+    resize();
+  }
+  function resize() {
+    if (!renderer) return;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false); cv.style.height = h + "px"; camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  function makeLabels(model) {
+    for (const p of model.parts) { const d = document.createElement("div"); d.className = "lbl"; d.textContent = p.name.replace(/ \(.+\)$/, ""); d.hidden = true; labelsEl.appendChild(d); p.lbl = d; }
+    if (model.poleLabels) model.poleLabels.forEach(pl => { const d = document.createElement("div"); d.className = "lbl"; d.textContent = pl.n; d.style.fontSize = "13px"; d.hidden = true; labelsEl.appendChild(d); pl.lbl = d; });
+  }
+  function pick(e) {
+    const r = cv.getBoundingClientRect();
+    ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(ptr, camera);
+    const model = models[kind];
+    const hits = ray.intersectObjects(model.root.children, true).filter(h => h.object.isMesh && h.object.visible && h.object.material !== M.field);
+    // prefer solid parts over glass when both are hit
+    const solid = hits.find(h => !h.object.material.transparent) || hits[0];
+    if (!solid) return;
+    const p = model.parts.find(pp => pp.name === solid.object.userData.part);
+    if (p) infoEl.innerHTML = `<b>${p.name}</b>${p.desc}`;
+  }
+
+  /* ---------- panel ---------- */
+  function buildPanel() {
+    const view = $("#m3dView");
+    slider(view, { label: "Teardown", min: 0, max: 100, value: 0, unit: "%", onInput: v => explode = v / 100 });
+    slider(view, { label: "Playback speed", min: 0.05, max: 1, step: 0.05, value: playback, dec: 2, unit: "×", onInput: v => playback = v });
+    $("#m3dLabelsChk").addEventListener("change", e => showLabels = e.target.checked);
+    $("#m3dFieldChk").addEventListener("change", e => showField = e.target.checked);
+    $("#m3dCaseChk").addEventListener("change", e => showCase = e.target.checked);
+    ctlDC = $("#m3dCtlDC"); ctlServo = $("#m3dCtlServo"); ctlStep = $("#m3dCtlStep");
+    heading(ctlDC, "Drive the motor");
+    slider(ctlDC, { label: "Supply voltage", min: -12, max: 12, step: 0.5, value: S.dc.V, dec: 1, unit: "V", onInput: v => S.dc.V = v });
+    slider(ctlDC, { label: "Load torque", min: 0, max: 40, step: 1, value: S.dc.load, unit: "mN·m", onInput: v => S.dc.load = v });
+    const r1 = row(ctlDC); button(r1, "Stop (0 V)", () => { S.dc.V = 0; ctlDC.querySelector("input").value = 0; ctlDC.querySelector("input").dispatchEvent(new Event("input")); });
+    heading(ctlServo, "Command an angle");
+    slider(ctlServo, { label: "Target angle", min: 0, max: 180, value: S.servo.target, unit: "°", onInput: v => S.servo.target = v });
+    const r2 = row(ctlServo);
+    [0, 90, 180].forEach(a => button(r2, a + "°", () => { const s = ctlServo.querySelector("input"); s.value = a; s.dispatchEvent(new Event("input")); }));
+    heading(ctlStep, "Step sequence");
+    makeSeg(ctlStep, [["wave", "Wave"], ["full", "Full step"], ["half", "Half step"]], "full", v => {
+      const st = S.step; st.mode = v; st.idx = 0; st.count = 0; [st.iA, st.iB] = SEQ[v][0]; buildStepTable();
+    });
+    slider(ctlStep, { label: "Step rate", min: 0.5, max: 30, step: 0.5, value: S.step.rate, dec: 1, unit: "steps/s", onInput: v => S.step.rate = v });
+    const r3 = row(ctlStep); r3.style.marginTop = "6px";
+    const autoB = button(r3, "Running", () => { S.step.auto = !S.step.auto; autoB.textContent = S.step.auto ? "Running" : "Paused"; autoB.setAttribute("aria-pressed", S.step.auto); });
+    autoB.setAttribute("aria-pressed", "true");
+    button(r3, "Step once", () => { S.step.auto = false; autoB.textContent = "Paused"; autoB.setAttribute("aria-pressed", false); doStep(); });
+    button(r3, "Reverse", () => S.step.dir *= -1);
+    const tw = document.createElement("div"); tw.style.marginTop = "10px"; ctlStep.appendChild(tw); ctlStep.tbl = tw;
+    buildStepTable();
+    ro = readouts($("#m3dRo"), []);
+    segmented($("#motorTabs"), setKind);
+  }
+  function buildStepTable() {
+    const st = S.step, seq = SEQ[st.mode];
+    const sign = v => v > 0 ? "+" : v < 0 ? "−" : "0";
+    ctlStep.tbl.innerHTML = `<table class="tbl-mini"><tr><th>Step</th><th>Coil A</th><th>Coil B</th></tr>${seq.map((s, i) => `<tr data-i="${i}"><td>${i + 1}</td><td>${sign(s[0])}</td><td>${sign(s[1])}</td></tr>`).join("")}</table>`;
+    hiStep();
+  }
+  function hiStep() { $$("tr[data-i]", ctlStep.tbl).forEach(r => r.classList.toggle("hi", +r.dataset.i === S.step.idx)); }
+  function doStep() {
+    const st = S.step, seq = SEQ[st.mode];
+    st.idx = (st.idx + st.dir + seq.length) % seq.length; st.count += st.dir; [st.iA, st.iB] = seq[st.idx]; hiStep();
+  }
+  function setKind(k) {
+    kind = k;
+    if (CAM[k]) { orbit.th = CAM[k].th; orbit.ph = CAM[k].ph; orbit.zoom = 1; }
+    for (const m in models) models[m].root.visible = m === k;
+    for (const m in models) for (const p of models[m].parts) if (p.lbl) p.lbl.hidden = true;
+    for (const m in models) if (models[m].poleLabels) models[m].poleLabels.forEach(pl => pl.lbl.hidden = true);
+    ctlDC.hidden = k !== "dc"; ctlServo.hidden = k !== "servo"; ctlStep.hidden = k !== "stepper";
+    $$("#learnMotors article").forEach(a => a.hidden = a.dataset.for !== k);
+    infoEl.innerHTML = "<b>Click a part</b>Each part explains itself. Use the teardown slider to pull the motor apart.";
+    $("#m3dFieldChk").closest("label").hidden = k !== "dc";
+    if (k === "dc") ro = readouts($("#m3dRo"), [["rpm", "Real speed", "RPM"], ["i", "Current", "A"], ["emf", "Back-EMF", "V"], ["tq", "Motor torque", "mN·m"]]);
+    if (k === "servo") ro = readouts($("#m3dRo"), [["tgt", "Target", "°"], ["ang", "Actual", "°"], ["pw", "Pulse width", "µs"], ["drv", "Motor drive", "%"]]);
+    if (k === "stepper") ro = readouts($("#m3dRo"), [["steps", "Step count", ""], ["deg", "Rotor angle", "°"], ["sa", "Step angle", "°"], ["coils", "Coils on", ""]]);
+  }
+
+  /* ---------- simulation ---------- */
+  const DC = { R: 2.0, K: 0.019, Vmax: 12 }; // ~6000 RPM no-load at 12 V
+  function simulate(dt) {
+    const sdt = dt * playback;
+    if (kind === "dc") {
+      const s = S.dc, m = models.dc;
+      const tl = s.load / 1000;
+      // real motor steady-state: w = (V - R*TL/K)/K with load opposing motion
+      const sgnV = Math.sign(s.V) || 0;
+      let wss = (s.V - sgnV * DC.R * tl / DC.K) / DC.K;
+      if (Math.sign(wss) !== sgnV) wss = 0; // stalled by load
+      s.w += (wss - s.w) * (1 - Math.exp(-dt / 0.25));
+      const emf = DC.K * s.w, I = (s.V - emf) / DC.R;
+      s.ang += s.w * sdt * 0.02; // slow-motion: 1 rad/s real -> 0.02 rad/s shown, scaled further by playback
+      m.rotor.obj.rotation.z = s.ang; m.comm.obj.rotation.z = s.ang;
+      // coil polarity: shoe at angle phi; N magnet at 90°, S at 270°
+      for (let k = 0; k < 3; k++) {
+        const phi = Math.PI / 2 + k * TAU / 3 + s.ang;
+        const c = -Math.cos(phi) * Math.sign(s.V);
+        const on = Math.abs(Math.cos(phi)) > 0.22 && Math.abs(I) > 0.01;
+        const sh = m.shoes[k], co = m.coils[k];
+        if (!on) { sh.emissive.setHex(0x000000); co.emissive.setHex(0x000000); }
+        else {
+          const inten = clamp(Math.abs(I) / 3, 0.25, 1);
+          sh.emissive.setHex(c > 0 ? 0xd2422e : 0x2f68dd); sh.emissiveIntensity = 0.75 * inten;
+          co.emissive.setHex(0xff7a1a); co.emissiveIntensity = 0.35 * inten;
+        }
+      }
+      ro("rpm", fmt(s.w * 60 / TAU)); ro("i", fmt(Math.abs(I), 2)); ro("emf", fmt(emf, 1)); ro("tq", fmt(Math.abs(DC.K * I) * 1000, 1));
+    } else if (kind === "servo") {
+      const s = S.servo, m = models.servo;
+      const err = s.target - s.ang;
+      const speed = clamp(err * 8, -400, 400); // deg/s, ~0.15 s per 60°
+      s.drive = speed / 400;
+      s.ang += speed * sdt;
+      const outRad = s.ang * Math.PI / 180;
+      s.motorAng += speed * sdt * 125 * Math.PI / 180;
+      m.horn.obj.rotation.y = outRad - Math.PI / 2;
+      m.gOut.obj.rotation.y = outRad;
+      m.g2.obj.rotation.y = -outRad * 5;
+      m.g1.obj.rotation.y = outRad * 25;
+      m.pinion.rotation.y = -outRad * 125;
+      m.wiper.parent.rotation.y = outRad;
+      ro("tgt", fmt(s.target)); ro("ang", fmt(s.ang)); ro("pw", fmt(500 + s.target / 180 * 2000)); ro("drv", fmt(s.drive * 100));
+    } else {
+      const s = S.step, m = models.stepper;
+      if (s.auto) { s.acc += sdt * s.rate; while (s.acc >= 1) { s.acc -= 1; doStep(); } }
+      const n = Math.abs(s.iA) + Math.abs(s.iB);
+      const tgt = Math.atan2(-s.iA, -s.iB);
+      const kq = 260 * (n === 2 ? 1.41 : 1);
+      const sub = 8, h = sdt / sub;
+      for (let i = 0; i < sub; i++) { const a = -kq * Math.sin(s.ang - tgt) - 6 * s.w; s.w += a * h; s.ang += s.w * h; }
+      m.rotor.obj.rotation.z = s.ang;
+      const phases = [s.iA, s.iB, -s.iA, -s.iB];
+      for (let k = 0; k < 4; k++) {
+        const v = phases[k], pm = m.poleMats[k], cm = m.statCoils[k];
+        if (v === 0) { pm.emissive.setHex(0); cm.emissive.setHex(0); }
+        else { pm.emissive.setHex(v > 0 ? 0xd2422e : 0x2f68dd); pm.emissiveIntensity = 0.8; cm.emissive.setHex(0xff7a1a); cm.emissiveIntensity = 0.22; }
+      }
+      const seqLen = SEQ[s.mode].length;
+      let deg = ((-s.ang * 180 / Math.PI) % 360 + 360) % 360;
+      ro("steps", s.count); ro("deg", fmt(deg)); ro("sa", fmt(360 / seqLen, 0)); ro("coils", n);
+    }
+  }
+
+  function render() {
+    const model = models[kind];
+    for (const p of model.parts) p.obj.position.copy(p.base).addScaledVector(p.ex, explode);
+    for (const c of model.caseParts) c.visible = showCase;
+    if (model.field) model.field.visible = showField && explode < 0.35;
+    const cm = CAM[kind]; orbit.target.y = cm.ty + cm.tyEx * explode;
+    const rr = (cm.r + cm.rEx * explode) * orbit.zoom;
+    const t = orbit.target;
+    camera.position.set(t.x + rr * Math.sin(orbit.ph) * Math.sin(orbit.th), t.y + rr * Math.cos(orbit.ph), t.z + rr * Math.sin(orbit.ph) * Math.cos(orbit.th));
+    camera.lookAt(t);
+    renderer.render(scene, camera);
+    // labels
+    const w = stage.clientWidth, h = stage.clientHeight, v = new THREE.Vector3();
+    for (const p of model.parts) {
+      if (!p.lbl) continue;
+      const hide = !showLabels || (!showCase && model.caseParts.includes(p.obj));
+      if (hide) { p.lbl.hidden = true; continue; }
+      v.copy(p.obj.position).add(p.labelAt); model.root.localToWorld(v);
+      v.project(camera);
+      p.lbl.hidden = v.z > 1;
+      p.lbl.style.left = ((v.x + 1) / 2 * w) + "px"; p.lbl.style.top = ((1 - v.y) / 2 * h) + "px";
+    }
+    if (model.poleLabels) {
+      const st = model.parts.find(pp => pp.name.startsWith("Stator"));
+      model.poleLabels.forEach(pl => {
+        if (!showLabels) { pl.lbl.hidden = true; return; }
+        v.set(Math.cos(pl.a) * 1.42, Math.sin(pl.a) * 1.42, 1.1).add(st.obj.position); model.root.localToWorld(v); v.project(camera);
+        pl.lbl.hidden = v.z > 1; pl.lbl.style.left = ((v.x + 1) / 2 * w) + "px"; pl.lbl.style.top = ((1 - v.y) / 2 * h) + "px";
+      });
+    }
+  }
+  return {
+    init, show() { setKind(kind); resize(); },
+    tick(dt) { if (!renderer) return; simulate(dt); render(); }
+  };
+})();
+/* ================= 2. PWM ================= */
+MODS.pwm = (() => {
+  const S = { tab: "led", duty: 50, f: 2, vs: 5, pw: 1500, t: 0, bright: 0, rpm: 0, servoAng: 90, rpmHist: [], instOn: false };
+  let ro, gPwm, gServo, scope, dev, sDuty, sF, sPw, scopeCap, devCap, codeEl;
+  const Vf = 1.4, TAUm = 0.15; // motor friction voltage, mechanical time constant
+
+  function init() {
+    scope = $("#pwmScope"); dev = $("#pwmDev"); scopeCap = $("#pwmScopeCap"); devCap = $("#pwmDevCap"); codeEl = $("#pwmCode");
+    const ctl = $("#pwmCtl");
+    gPwm = document.createElement("div"); gServo = document.createElement("div"); ctl.append(gPwm, gServo);
+    heading(gPwm, "Signal");
+    sDuty = slider(gPwm, { label: "Duty cycle", min: 0, max: 100, step: 0.5, value: S.duty, dec: 1, unit: "%", onInput: v => { S.duty = v; code(); } });
+    sF = slider(gPwm, { label: "Frequency", min: 0.5, max: 20000, log: true, value: S.f, fmt: fHz, onInput: v => { S.f = v; code(); } });
+    const r = row(gPwm);
+    button(r, "2 Hz (slow)", () => sF.set(2));
+    button(r, "490 Hz (Arduino)", () => sF.set(490));
+    button(r, "20 kHz (driver)", () => sF.set(20000));
+    const vsWrap = document.createElement("div"); vsWrap.style.marginTop = "12px"; gPwm.appendChild(vsWrap);
+    heading(vsWrap, "Supply voltage");
+    S.vsSeg = makeSeg(vsWrap, [["5", "5 V"], ["12", "12 V"]], "5", v => { S.vs = +v; code(); });
+    heading(gServo, "Servo pulse");
+    sPw = slider(gServo, { label: "Pulse width", min: 500, max: 2500, step: 10, value: S.pw, unit: "µs", onInput: v => { S.pw = v; code(); } });
+    const r2 = row(gServo);
+    [[500, "0.5 ms"], [1000, "1.0 ms"], [1500, "1.5 ms"], [2000, "2.0 ms"], [2500, "2.5 ms"]].forEach(([v, l]) => button(r2, l, () => sPw.set(v)));
+    const pr = document.createElement("p"); pr.className = "hint"; pr.style.margin = "10px 0 0";
+    pr.textContent = "The period is fixed at 20 ms (50 Hz). Only the width of the high pulse changes.";
+    gServo.appendChild(pr);
+    segmented($("#pwmTabs"), setTab);
+    setTab("led");
+    document.addEventListener("themechange", () => {});
+  }
+  function fHz(v) { return v >= 1000 ? fmt(v / 1000, v >= 10000 ? 0 : 1) + " kHz" : fmt(v, v < 10 ? 1 : 0) + " Hz"; }
+  function setTab(t) {
+    S.tab = t;
+    gPwm.hidden = t === "servo"; gServo.hidden = t !== "servo";
+    if (t === "motor" && S.vs === 5) { S.vs = 12; S.vsSeg.set("12"); }
+    if (t === "led" && S.vs === 12) { S.vs = 5; S.vsSeg.set("5"); }
+    if (t === "servo") ro = readouts($("#pwmRo"), [["pw", "Pulse width", "µs"], ["ang", "Horn angle", "°"], ["duty", "Duty cycle", "%"], ["f", "Frequency", "Hz"]]);
+    else if (t === "motor") ro = readouts($("#pwmRo"), [["duty", "Duty cycle", "%"], ["aw", "analogWrite", ""], ["avg", "Average", "V"], ["rpm", "Motor speed", "RPM"]]);
+    else ro = readouts($("#pwmRo"), [["duty", "Duty cycle", "%"], ["aw", "analogWrite", ""], ["avg", "Average", "V"], ["br", "Perceived", "%"]]);
+    devCap.textContent = t === "led" ? "LED with resistor on pin 9" : t === "motor" ? "DC motor through a driver" : "Servo on pin 9";
+    code();
+  }
+  const kw = s => `<span class="k">${s}</span>`, cm = s => `<span class="c">${s}</span>`, vv = s => `<span class="v">${s}</span>`;
+  function code() {
+    const aw = Math.round(S.duty / 100 * 255);
+    let c;
+    if (S.tab === "servo") {
+      const ang = Math.round((S.pw - 500) / 2000 * 180);
+      c = `#include &lt;Servo.h&gt;\nServo arm;\n\n${kw("void")} setup() {\n  arm.attach(9, 500, 2500);\n}\n${kw("void")} loop() {\n  arm.writeMicroseconds(${vv(S.pw)});\n  ${cm("// same as arm.write(" + ang + ")")}\n}`;
+    } else {
+      const pin = S.tab === "motor" ? "ENA" : "LED_PIN";
+      const fNote = Math.abs(S.f - 490) < 1 ? "Uno pin 9 runs at 490 Hz" : "Uno default is 490 Hz;\n  // other rates need timer setup";
+      c = `${kw("const int")} ${pin} = 9;\n\n${kw("void")} setup() {\n  pinMode(${pin}, OUTPUT);\n}\n${kw("void")} loop() {\n  analogWrite(${pin}, ${vv(aw)}); ${cm("// " + fmt(aw / 255 * 100) + "%")}\n  ${cm("// " + fNote)}\n}`;
+      if (S.tab === "motor") c = cm("// pin 9 → driver ENA input,\n// never straight to the motor") + "\n" + c;
+    }
+    codeEl.innerHTML = c;
+  }
+  /* exact average of the PWM signal over [t0, t1] */
+  function avgOn(t0, t1, f, D) {
+    const F = t => { const T = 1 / f, n = Math.floor(t / T), r = t - n * T; return n * D * T + Math.min(r, D * T); };
+    return (F(t1) - F(t0)) / Math.max(t1 - t0, 1e-12);
+  }
+
+  function tick(dt) {
+    const t0 = S.t; S.t += dt;
+    const D = S.duty / 100;
+    if (S.tab !== "servo") {
+      const T = 1 / S.f; S.instOn = ((S.t % T) / T) < D;
+      // LED: eye integrates with ~20 ms time constant
+      const frameAvg = D <= 0 ? 0 : D >= 1 ? 1 : avgOn(t0, S.t, S.f, D);
+      S.bright += (frameAvg - S.bright) * (1 - Math.exp(-dt / 0.02));
+      // motor: first-order speed with friction, integrated over sub-steps that resolve slow PWM
+      const n = S.f > 200 ? 4 : Math.max(4, Math.ceil(dt / (T / 40)));
+      const h = dt / n; let tt = t0;
+      for (let i = 0; i < n; i++) {
+        const v = (D <= 0 ? 0 : D >= 1 ? 1 : avgOn(tt, tt + h, S.f, D)) * S.vs; tt += h;
+        let a = ((v * 500) - S.rpm) / TAUm;
+        const fr = Vf * 500 / TAUm;
+        if (S.rpm > 0.5) a -= fr; else if (a < fr) { a = 0; S.rpm = 0; } else a -= fr;
+        S.rpm = Math.max(0, S.rpm + a * h);
+      }
+      S.rpmHist.push(S.t, S.rpm); while (S.rpmHist.length && S.rpmHist[0] < S.t - 3) S.rpmHist.splice(0, 2);
+      S.motAng = (S.motAng || 0) + S.rpm / 60 * TAU * dt * 0.05; // shown 20× slower
+      ro("duty", fmt(S.duty, 1)); ro("aw", Math.round(D * 255)); ro("avg", fmt(D * S.vs, 2));
+      if (S.tab === "led") ro("br", fmt(S.bright * 100)); else ro("rpm", fmt(S.rpm));
+    } else {
+      const target = clamp((S.pw - 500) / 2000 * 180, 0, 180);
+      const err = target - S.servoAng; S.servoAng += clamp(err * 10, -400, 400) * dt;
+      ro("pw", S.pw); ro("ang", fmt(S.servoAng)); ro("duty", fmt(S.pw / 20000 * 100, 1)); ro("f", 50);
+    }
+    drawScope(); drawDev();
+  }
+
+  function unitFor(win) { return win >= 1 ? [1, "s"] : win >= 1e-3 ? [1e3, "ms"] : [1e6, "µs"]; }
+  function drawScope() {
+    const { ctx, w, h } = fitCanvas(scope);
+    ctx.clearRect(0, 0, w, h);
+    const padL = 46, padR = 16, padT = 52, padB = 26;
+    const servo = S.tab === "servo";
+    const vs = servo ? 5 : S.vs;
+    const T = servo ? 0.02 : 1 / S.f, D = servo ? S.pw / 20000 : S.duty / 100, win = servo ? 0.045 : 4 * T;
+    const X = t => padL + t / win * (w - padL - padR), Y = v => padT + (1 - v / (vs * 1.15)) * (h - padT - padB);
+    const [us, un] = unitFor(win);
+    ctx.font = "12px Barlow, sans-serif"; ctx.fillStyle = C.muted; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (const v of [0, vs / 2, vs]) { const y = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillText(fmt(v, 1) + " V", padL - 6, y); }
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const ticks = 8;
+    for (let i = 0; i <= ticks; i++) { const t = win * i / ticks; ctx.fillText(+(t * us).toPrecision(3) + " " + un, X(t), h - 6); }
+    if (servo) { // shade the valid pulse range in each period
+      ctx.fillStyle = C.field; ctx.globalAlpha = 0.09;
+      for (let k = 0; k < 3; k++) { const s0 = k * T; if (s0 > win) break; ctx.fillRect(X(s0 + 0.0005), padT - 4, X(0.002) - X(0), h - padT - padB + 4); }
+      ctx.globalAlpha = 1;
+    }
+    // waveform
+    ctx.strokeStyle = C.copper; ctx.lineWidth = 2.2; ctx.beginPath();
+    let t = 0; ctx.moveTo(X(0), Y(D > 0 ? vs : 0));
+    while (t < win) {
+      const on = Math.min(t + D * T, win), off = Math.min(t + T, win);
+      if (D > 0 && D < 1) { ctx.lineTo(X(on), Y(vs)); ctx.lineTo(X(on), Y(0)); ctx.lineTo(X(off), Y(0)); if (off < win) ctx.lineTo(X(off), Y(vs)); }
+      else ctx.lineTo(X(off), Y(D >= 1 ? vs : 0));
+      t += T;
+    }
+    ctx.stroke();
+    // annotations
+    ctx.fillStyle = C.ink; ctx.font = "600 13px Barlow, sans-serif"; ctx.textAlign = "center";
+    if (servo) {
+      const x0 = X(0), x1 = X(D * T);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Y(vs) - 10); ctx.lineTo(x1, Y(vs) - 10); ctx.stroke();
+      ctx.textAlign = "left"; ctx.fillText(fmt(S.pw / 1000, 2) + " ms pulse", x1 + 6, Y(vs) - 6);
+      const xp0 = X(0), xp1 = X(T);
+      ctx.fillStyle = C.muted; ctx.font = "13px Barlow, sans-serif"; ctx.textAlign = "center";
+      ctx.beginPath(); ctx.moveTo(xp0, Y(0) - 12); ctx.lineTo(xp1, Y(0) - 12); ctx.strokeStyle = C.muted; ctx.stroke();
+      ctx.fillText("period 20 ms", (xp0 + xp1) / 2, Y(0) - 17);
+      scopeCap.textContent = "Signal wire voltage (shaded band: 0.5 to 2.5 ms valid range)";
+    } else {
+      const avg = D * vs, y = Y(avg);
+      ctx.setLineDash([6, 5]); ctx.strokeStyle = C.field; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C.field; ctx.textAlign = "right"; ctx.fillText("average " + fmt(avg, 2) + " V", w - padR - 4, y - 7);
+      // on-time / period dimension on first cycle
+      if (D > 0.04 && D < 0.96) {
+        ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.fillStyle = C.ink; ctx.textAlign = "center"; ctx.font = "13px Barlow, sans-serif";
+        const yy = Y(vs) - 10; ctx.beginPath(); ctx.moveTo(X(0), yy); ctx.lineTo(X(D * T), yy); ctx.stroke();
+        ctx.fillText("on " + +(D * T * us).toPrecision(3) + " " + un, X(D * T / 2), yy - 5);
+        ctx.strokeStyle = C.muted; ctx.fillStyle = C.muted; const y2 = Y(0) + 0; ctx.beginPath(); ctx.moveTo(X(T), yy); ctx.lineTo(X(2 * T), yy); ctx.stroke();
+        ctx.fillText("period " + +(T * us).toPrecision(3) + " " + un, X(1.5 * T), yy - 5);
+      }
+      // live cursor when slow enough to follow
+      if (S.f <= 8) {
+        const tc = S.t % win; ctx.strokeStyle = C.ink; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(X(tc), padT - 6); ctx.lineTo(X(tc), h - padB); ctx.stroke(); ctx.globalAlpha = 1;
+        const onNow = ((tc % T) / T) < D; ctx.fillStyle = C.copper; ctx.beginPath(); ctx.arc(X(tc), Y(onNow ? vs : 0), 5, 0, TAU); ctx.fill();
+      }
+      scopeCap.textContent = "Pin 9 voltage: " + fmt(S.duty, 1) + "% duty at " + fHz(S.f);
+    }
+  }
+
+  function drawDev() {
+    const { ctx, w, h } = fitCanvas(dev);
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = "14px Barlow, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    if (S.tab === "led") {
+      const cx = w * 0.5, cy = h * 0.5, b = clamp(S.bright, 0, 1);
+      // glow
+      const g = ctx.createRadialGradient(cx, cy - 20, 4, cx, cy - 20, 150);
+      g.addColorStop(0, `rgba(255,70,40,${0.65 * b})`); g.addColorStop(1, "rgba(255,70,40,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      // LED body
+      ctx.fillStyle = `rgb(${Math.round(120 + 135 * b)},${Math.round(30 + 60 * b)},${Math.round(25 + 40 * b)})`;
+      ctx.beginPath(); ctx.arc(cx, cy - 32, 34, Math.PI, 0); ctx.lineTo(cx + 34, cy + 22); ctx.lineTo(cx - 34, cy + 22); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = C.muted; ctx.fillRect(cx - 42, cy + 22, 84, 8);
+      ctx.strokeStyle = C.muted; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx - 14, cy + 30); ctx.lineTo(cx - 14, cy + 90); ctx.moveTo(cx + 14, cy + 30); ctx.lineTo(cx + 14, cy + 78); ctx.stroke();
+      // perceived bar
+      const bx = w - 60, by = 40, bh = h - 80;
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(bx, by, 18, bh);
+      ctx.fillStyle = C.copper; ctx.fillRect(bx, by + bh * (1 - b), 18, bh * b);
+      ctx.fillStyle = C.muted; ctx.font = "12px Barlow, sans-serif"; ctx.fillText("perceived", bx + 9, by + bh + 18);
+      // instantaneous state
+      ctx.textAlign = "left"; ctx.fillStyle = C.ink; ctx.font = "14px Barlow, sans-serif";
+      ctx.fillText(S.f < 50 ? "You see flicker: the eye can follow " + fHz(S.f) + "." : "Steady light: too fast for the eye, so it sees the average.", 16, h - 16);
+    } else if (S.tab === "motor") {
+      const cx = Math.min(w * 0.25, 180), cy = h * 0.5, R = Math.min(90, h * 0.33);
+      ctx.fillStyle = C.surface; ctx.strokeStyle = C.muted; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(S.motAng || 0);
+      ctx.fillStyle = C.copper;
+      for (let k = 0; k < 3; k++) { ctx.rotate(TAU / 3); ctx.beginPath(); ctx.ellipse(0, -R * 0.48, R * 0.18, R * 0.4, 0, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(0, 0, 8, 0, TAU); ctx.fill(); ctx.restore();
+      ctx.fillStyle = C.muted; ctx.font = "12px Barlow, sans-serif"; ctx.fillText("fan shown 20× slower", cx, cy + R + 20);
+      // rpm history chart
+      const x0 = cx + R + 50, x1 = w - 20, y0 = 30, y1 = h - 40, maxR = S.vs * 500 * 1.1;
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.textAlign = "right"; ctx.fillStyle = C.muted;
+      for (const v of [0, maxR / 2, maxR]) { const y = y1 - v / maxR * (y1 - y0); ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.fillText(fmt(v) + "", x0 - 6, y + 4); }
+      ctx.textAlign = "left"; ctx.fillText("RPM, last 3 s", x0, 18);
+      const H = S.rpmHist; ctx.strokeStyle = C.copper; ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 0; k < H.length; k += 2) { const x = x1 - (S.t - H[k]) / 3 * (x1 - x0), y = y1 - H[k + 1] / maxR * (y1 - y0); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+      const ss = Math.max(0, (S.duty / 100 * S.vs - Vf)) * 500;
+      const ys = y1 - ss / maxR * (y1 - y0); ctx.setLineDash([5, 4]); ctx.strokeStyle = C.field; ctx.beginPath(); ctx.moveTo(x0, ys); ctx.lineTo(x1, ys); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C.ink; ctx.font = "14px Barlow, sans-serif";
+      let msg;
+      if (S.duty / 100 * S.vs < Vf + 0.05) msg = "Not enough average voltage to overcome friction, so the motor stalls.";
+      else if (S.f < 15) msg = "Speed ripples: each pulse kicks the rotor, then it slows between pulses.";
+      else if (S.f < 18000) msg = "Smooth speed, but you would hear the windings whine at " + fHz(S.f) + ".";
+      else msg = "Smooth and silent: above the range of human hearing.";
+      ctx.fillText(msg, x0, h - 12);
+    } else {
+      const cx = w * 0.42, cy = h * 0.55, s = Math.min(1, h / 300);
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(s, s);
+      ctx.fillStyle = "#2f363d"; ctx.fillRect(-120, -50, 240, 100);
+      ctx.fillRect(-160, -10, 320, 20);
+      ctx.fillStyle = C.paper; for (const x of [-145, 145]) { ctx.beginPath(); ctx.arc(x, 0, 5, 0, TAU); ctx.fill(); }
+      const hx = 60;
+      // angle scale
+      ctx.strokeStyle = C.muted; ctx.lineWidth = 1; ctx.fillStyle = C.muted; ctx.font = "12px Barlow, sans-serif"; ctx.textAlign = "center";
+      for (let a = 0; a <= 180; a += 30) { const r = a * Math.PI / 180; const c = Math.cos(Math.PI - r), sn = -Math.sin(Math.PI - r); ctx.beginPath(); ctx.moveTo(hx + c * 112, sn * 112); ctx.lineTo(hx + c * 122, sn * 122); ctx.stroke(); ctx.fillText(a + "°", hx + c * 138, sn * 138 + 4); }
+      // horn
+      const ang = Math.PI - S.servoAng * Math.PI / 180;
+      ctx.save(); ctx.translate(hx, 0); ctx.rotate(-ang);
+      ctx.fillStyle = "#efefea"; ctx.strokeStyle = "#999"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(100, -7); ctx.arc(100, 0, 7, -Math.PI / 2, Math.PI / 2); ctx.lineTo(0, 14); ctx.arc(0, 0, 14, Math.PI / 2, -Math.PI / 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#777"; for (let i = 1; i < 5; i++) { ctx.beginPath(); ctx.arc(i * 22, 0, 2.5, 0, TAU); ctx.fill(); }
+      ctx.restore();
+      ctx.fillStyle = "#cfcfcf"; ctx.beginPath(); ctx.arc(hx, 0, 6, 0, TAU); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = C.ink; ctx.font = "14px Barlow, sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("Commanded " + fmt((S.pw - 500) / 2000 * 180) + "°   (0.5 ms → 0°, 1.5 ms → 90°, 2.5 ms → 180°)", 16, h - 14);
+    }
+  }
+  return { init, tick };
+})();
+/* ================= 3. H-BRIDGE ================= */
+MODS.hbridge = (() => {
+  const S = { mode: "manual", q: [false, false, false, false], in1: 1, in2: 0, en: true, duty: 100, slowPwm: false,
+    w: 0, ang: 0, fly: 0, flyDir: 0, t: 0, prevDrive: 0, fault: false };
+  let svg, ro, statusEl, gManual, gDriver, truthEl, lastState = "";
+  const LEG = { L: 170, R: 430 }, RAIL = 40, GND = 400, MID = 210;
+
+  function init() {
+    statusEl = $("#hbStatus");
+    $("#hbSvg").innerHTML = drawSVG();
+    svg = $("#hbSvg svg");
+    $$(".sw", svg).forEach(g => {
+      const i = +g.dataset.i;
+      const toggle = () => { if (S.mode !== "manual") return; S.q[i] = !S.q[i]; };
+      g.addEventListener("click", toggle);
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    });
+    const ctl = $("#hbCtl");
+    gManual = document.createElement("div"); gDriver = document.createElement("div"); ctl.append(gManual, gDriver);
+    heading(gManual, "Presets");
+    const r = row(gManual);
+    const preset = q => () => { S.q = q.slice(); };
+    button(r, "Forward", preset([true, false, false, true]));
+    button(r, "Reverse", preset([false, true, true, false]));
+    button(r, "Brake", preset([false, true, false, true]));
+    button(r, "Coast", preset([false, false, false, false]));
+    button(r, "Shoot-through", preset([true, true, false, false]), "danger");
+    const p = document.createElement("p"); p.className = "hint"; p.style.margin = "10px 0 0";
+    p.textContent = "Or click any switch in the circuit. Try forward, then coast, and watch the diodes.";
+    gManual.appendChild(p);
+
+    heading(gDriver, "Driver logic pins");
+    const pins = row(gDriver);
+    const pinBtn = (label, key) => { const b = button(pins, label, () => { S[key] = S[key] ? 0 : 1; upd(); }); const upd = () => { b.setAttribute("aria-pressed", !!S[key]); b.textContent = label + " = " + (S[key] ? "HIGH" : "LOW"); }; upd(); return upd; };
+    pinBtn("IN1", "in1"); pinBtn("IN2", "in2");
+    const enB = button(pins, "ENA on", () => { S.en = !S.en; enB.textContent = S.en ? "ENA on" : "ENA off"; enB.setAttribute("aria-pressed", S.en); });
+    enB.setAttribute("aria-pressed", "true");
+    slider(gDriver, { label: "PWM on ENA (speed)", min: 0, max: 100, value: S.duty, unit: "%", onInput: v => S.duty = v });
+    checkbox(gDriver, "Show PWM in slow motion (2 Hz)", false, v => S.slowPwm = v);
+    truthEl = document.createElement("div"); truthEl.style.marginTop = "8px"; gDriver.appendChild(truthEl);
+    truthEl.innerHTML = `<table class="tbl-mini"><tr><th>ENA</th><th>IN1</th><th>IN2</th><th>Motor</th></tr>
+      <tr data-k="f"><td>1</td><td>1</td><td>0</td><td>Forward</td></tr>
+      <tr data-k="r"><td>1</td><td>0</td><td>1</td><td>Reverse</td></tr>
+      <tr data-k="b"><td>1</td><td>same</td><td>same</td><td>Brake</td></tr>
+      <tr data-k="c"><td>0</td><td>x</td><td>x</td><td>Coast</td></tr></table>`;
+    ro = readouts($("#hbRo"), [["va", "Node A", ""], ["vb", "Node B", ""], ["dir", "Motor current", ""], ["spd", "Speed", "%"]]);
+    segmented($("#hbTabs"), v => { S.mode = v; setMode(); });
+    setMode();
+  }
+  function setMode() {
+    gManual.hidden = S.mode !== "manual"; gDriver.hidden = S.mode !== "driver";
+    $$(".sw", svg).forEach(g => { g.style.cursor = S.mode === "manual" ? "pointer" : "default"; g.setAttribute("tabindex", S.mode === "manual" ? "0" : "-1"); });
+  }
+
+  function drawSVG() {
+    const L = LEG.L, R = LEG.R;
+    const sw = (i, x, y0, label, side) => `
+      <g class="sw" data-i="${i}" role="button" tabindex="0" aria-label="Switch ${label}">
+        <rect class="hit" x="${x - 30}" y="${y0 - 8}" width="60" height="76" rx="6" fill="transparent" stroke="none"/>
+        <circle cx="${x}" cy="${y0}" r="4.5" class="pin"/><circle cx="${x}" cy="${y0 + 60}" r="4.5" class="pin"/>
+        <line class="lever" data-dir="${-side}" x1="${x}" y1="${y0 + 60}" x2="${x - side * 26}" y2="${y0 + 8}" stroke-width="3.5" stroke-linecap="round"/>
+        <text x="${x - side * 58}" y="${y0 + 30}" text-anchor="middle" class="qlbl">${label}</text>
+        <text x="${x - side * 58}" y="${y0 + 47}" text-anchor="middle" class="qstate">off</text>
+      </g>`;
+    const diode = (x, yc) => `<g class="diode"><path d="M${x - 11} ${yc + 8} L${x + 11} ${yc + 8} L${x} ${yc - 8} Z"/><line x1="${x - 12}" y1="${yc - 9}" x2="${x + 12}" y2="${yc - 9}" stroke-width="2.5"/></g>`;
+    const DX = 50;
+    return `<svg viewBox="0 0 600 440" role="img" aria-label="H-bridge circuit with four switches, flyback diodes and a motor">
+      <style>
+        .w{stroke:var(--muted);stroke-width:2.5;fill:none}
+        .pin{fill:var(--surface);stroke:var(--ink);stroke-width:2}
+        .lever{stroke:var(--ink)}
+        .sw.on .lever{stroke:var(--copper)}
+        .qlbl{font:600 16px Barlow,sans-serif;fill:var(--ink)}
+        .qstate{font:500 12px Barlow,sans-serif;fill:var(--muted)}
+        .sw.on .qstate{fill:var(--copper)}
+        .diode path{fill:var(--surface);stroke:var(--muted);stroke-width:2}
+        .diode line{stroke:var(--muted)}
+        .lbl2{font:500 13px Barlow,sans-serif;fill:var(--muted)}
+        .node{font:600 15px Barlow,sans-serif;fill:var(--ink)}
+      </style>
+      <!-- supply -->
+      <path class="w" d="M50 ${RAIL} L${R + DX} ${RAIL} M50 ${GND} L${R + DX} ${GND} M50 ${RAIL} L50 186 M50 234 L50 ${GND}"/>
+      <line x1="30" y1="190" x2="70" y2="190" stroke="var(--ink)" stroke-width="3"/>
+      <line x1="40" y1="203" x2="60" y2="203" stroke="var(--ink)" stroke-width="3"/>
+      <line x1="30" y1="216" x2="70" y2="216" stroke="var(--ink)" stroke-width="3"/>
+      <line x1="40" y1="229" x2="60" y2="229" stroke="var(--ink)" stroke-width="3"/>
+      <text x="80" y="200" class="lbl2">12 V</text><text x="58" y="30" class="lbl2">V+</text><text x="58" y="425" class="lbl2">GND</text>
+      <!-- legs -->
+      <path class="w" d="M${L} ${RAIL} L${L} 90 M${L} 150 L${L} 270 M${L} 330 L${L} ${GND}"/>
+      <path class="w" d="M${R} ${RAIL} L${R} 90 M${R} 150 L${R} 270 M${R} 330 L${R} ${GND}"/>
+      <!-- diodes -->
+      <path class="w" d="M${L - DX} ${RAIL} L${L - DX} ${GND} M${L - DX} ${MID} L${L} ${MID} M${R + DX} ${RAIL} L${R + DX} ${GND} M${R + DX} ${MID} L${R} ${MID}"/>
+      ${diode(L - DX, 125)}${diode(L - DX, 305)}${diode(R + DX, 125)}${diode(R + DX, 305)}
+      <text x="${L - DX - 16}" y="${130}" text-anchor="end" class="lbl2">D1</text><text x="${L - DX - 16}" y="${310}" text-anchor="end" class="lbl2">D2</text>
+      <text x="${R + DX + 16}" y="${130}" class="lbl2">D3</text><text x="${R + DX + 16}" y="${310}" class="lbl2">D4</text>
+      <g id="hbFlows"></g>
+      <!-- motor -->
+      <path class="w" d="M${L} ${MID} L264 ${MID} M336 ${MID} L${R} ${MID}"/>
+      <circle cx="300" cy="${MID}" r="36" fill="var(--surface)" stroke="var(--ink)" stroke-width="2.5"/>
+      <g id="hbRotor"><line x1="300" y1="${MID - 24}" x2="300" y2="${MID + 24}" stroke="var(--copper)" stroke-width="5" stroke-linecap="round"/><line x1="279" y1="${MID + 12}" x2="321" y2="${MID - 12}" stroke="var(--copper)" stroke-width="5" stroke-linecap="round" opacity=".55"/><line x1="279" y1="${MID - 12}" x2="321" y2="${MID + 12}" stroke="var(--copper)" stroke-width="5" stroke-linecap="round" opacity=".55"/></g>
+      <circle cx="300" cy="${MID}" r="6" fill="var(--ink)"/>
+      <path id="hbArrow" d="" fill="none" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ah)"/>
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>
+      <text x="${L + 14}" y="${MID - 10}" class="node">A</text><text x="${R - 26}" y="${MID - 10}" class="node">B</text>
+      <text x="300" y="${MID + 62}" text-anchor="middle" class="lbl2" id="hbMotorTxt">stopped</text>
+      ${sw(0, L, 90, "Q1", -1)}${sw(1, L, 270, "Q2", -1)}${sw(2, R, 90, "Q3", 1)}${sw(3, R, 270, "Q4", 1)}
+      <rect id="hbFault" x="4" y="4" width="592" height="432" rx="10" fill="none" stroke="var(--warn)" stroke-width="6" opacity="0"/>
+    </svg>`;
+  }
+
+  const P = (pts) => "M" + pts.map(p => p.join(" ")).join(" L");
+  function paths() {
+    const L = LEG.L, R = LEG.R, DX = 50;
+    return {
+      fwd: P([[50, 186], [50, RAIL], [L, RAIL], [L, MID], [R, MID], [R, GND], [50, GND], [50, 234]]),
+      rev: P([[50, 186], [50, RAIL], [R, RAIL], [R, MID], [L, MID], [L, GND], [50, GND], [50, 234]]),
+      shootL: P([[50, 186], [50, RAIL], [L, RAIL], [L, GND], [50, GND], [50, 234]]),
+      shootR: P([[50, 186], [50, RAIL], [R, RAIL], [R, GND], [50, GND], [50, 234]]),
+      brakeLow: P([[L, MID], [R, MID], [R, GND], [L, GND], [L, MID]]),
+      brakeHigh: P([[L, MID], [R, MID], [R, RAIL], [L, RAIL], [L, MID]]),
+      flyF: P([[50, 234], [50, GND], [L - DX, GND], [L - DX, MID], [R + DX, MID], [R + DX, RAIL], [50, RAIL], [50, 186]]),
+      flyR: P([[50, 234], [50, GND], [R + DX, GND], [R + DX, MID], [L - DX, MID], [L - DX, RAIL], [50, RAIL], [50, 186]])
+    };
+  }
+
+  function tick(dt) {
+    S.t += dt;
+    let q = S.q;
+    let pwmOff = false;
+    if (S.mode === "driver") {
+      let en = S.en;
+      if (en && S.slowPwm && S.duty < 100) { const ph = (S.t * 2) % 1; if (ph >= S.duty / 100) { en = false; pwmOff = true; } }
+      if (en && S.duty === 0) en = false;
+      q = en ? [!!S.in1, !S.in1, !!S.in2, !S.in2] : [false, false, false, false];
+      $$("tr[data-k]", truthEl).forEach(r => r.classList.remove("hi"));
+      const k = !S.en ? "c" : S.in1 === S.in2 ? "b" : S.in1 ? "f" : "r";
+      truthEl.querySelector(`tr[data-k="${k}"]`).classList.add("hi");
+    }
+    const [q1, q2, q3, q4] = q;
+    const shootL = q1 && q2, shootR = q3 && q4;
+    let state, drive = 0;
+    if (shootL || shootR) state = "shoot";
+    else if (q1 && q4) { state = "fwd"; drive = 1; }
+    else if (q3 && q2) { state = "rev"; drive = -1; }
+    else if (q2 && q4) state = "brakeLow";
+    else if (q1 && q3) state = "brakeHigh";
+    else state = "coast";
+    const scale = S.mode === "driver" && !S.slowPwm ? S.duty / 100 : 1;
+    // flyback: when drive current is interrupted
+    if (S.prevDrive !== 0 && drive === 0 && (state === "coast")) { S.fly = 1; S.flyDir = S.prevDrive; }
+    if (drive !== 0 || state !== "coast") S.fly = 0;
+    S.prevDrive = drive;
+    S.fly = Math.max(0, S.fly - dt / (pwmOff ? 0.25 : 0.8));
+    // motor dynamics
+    let a;
+    if (drive) a = (drive * scale - S.w) / 0.35;
+    else if (state === "brakeLow" || state === "brakeHigh") a = -S.w / 0.07;
+    else a = -S.w / 1.8;
+    S.w += a * dt; if (Math.abs(S.w) < 1e-3 && !drive) S.w = 0;
+    S.ang += S.w * dt * 9;
+    // visuals
+    $$(".sw", svg).forEach((g, i) => {
+      g.classList.toggle("on", q[i]);
+      const lv = $(".lever", g), x = +lv.getAttribute("x1"), y1 = +lv.getAttribute("y1"), dr = +lv.dataset.dir;
+      lv.setAttribute("x2", q[i] ? x : x + 26 * dr); lv.setAttribute("y2", q[i] ? y1 - 60 : y1 - 52);
+      $(".qstate", g).textContent = q[i] ? (S.mode === "driver" && S.duty < 100 && !S.slowPwm && (i === 0 || i === 2) ? "on (PWM)" : "on") : "off";
+    });
+    $("#hbRotor", svg).setAttribute("transform", `rotate(${S.ang * 180 / Math.PI} 300 ${MID})`);
+    const arrow = $("#hbArrow", svg);
+    if (Math.abs(S.w) > 0.03) {
+      const cw = S.w > 0, r = 50, a0 = cw ? -2.3 : -0.84, a1 = cw ? -0.84 : -2.3;
+      arrow.setAttribute("d", `M${300 + r * Math.cos(a0)} ${MID + r * Math.sin(a0)} A${r} ${r} 0 0 ${cw ? 1 : 0} ${300 + r * Math.cos(a1)} ${MID + r * Math.sin(a1)}`);
+      arrow.setAttribute("opacity", clamp(Math.abs(S.w) * 2, 0.2, 1));
+    } else arrow.setAttribute("d", "");
+    $("#hbMotorTxt", svg).textContent = Math.abs(S.w) < 0.02 ? "stopped" : (S.w > 0 ? "clockwise " : "counter-clockwise ") + fmt(Math.abs(S.w) * 100) + "%";
+    // flows
+    const PT = paths(); let flows = "";
+    const fl = (d, color, rev, op = 1) => `<path class="flow${rev ? " rev" : ""}" d="${d}" stroke="${color}" opacity="${op}"/>`;
+    if (state === "fwd") flows += fl(PT.fwd, "var(--copper)");
+    if (state === "rev") flows += fl(PT.rev, "var(--copper)");
+    if (shootL) flows += fl(PT.shootL, "var(--warn)");
+    if (shootR) flows += fl(PT.shootR, "var(--warn)");
+    if (state === "brakeLow" && Math.abs(S.w) > 0.02) flows += fl(PT.brakeLow, "var(--field)", S.w > 0, clamp(Math.abs(S.w) * 2, 0.3, 1));
+    if (state === "brakeHigh" && Math.abs(S.w) > 0.02) flows += fl(PT.brakeHigh, "var(--field)", S.w > 0, clamp(Math.abs(S.w) * 2, 0.3, 1));
+    if (S.fly > 0) flows += fl(S.flyDir > 0 ? PT.flyF : PT.flyR, "var(--amber)", false, S.fly);
+    $("#hbFlows", svg).innerHTML = flows;
+    $$(".diode path", svg).forEach((d, i) => {
+      const lit = S.fly > 0 && ((S.flyDir > 0 && (i === 1 || i === 2)) || (S.flyDir < 0 && (i === 0 || i === 3)));
+      d.style.fill = lit ? "var(--amber)" : ""; d.style.opacity = lit ? 0.4 + 0.6 * S.fly : "";
+    });
+    $("#hbFault", svg).setAttribute("opacity", state === "shoot" ? (0.5 + 0.5 * Math.sin(S.t * 14)) : 0);
+    // readouts
+    const node = (hi, lo) => hi && lo ? "short" : hi ? "12 V" : lo ? "0 V" : "float";
+    ro("va", node(q1, q2)); ro("vb", node(q3, q4));
+    ro("dir", state === "fwd" ? "A → B" : state === "rev" ? "B → A" : (state.startsWith("brake") && Math.abs(S.w) > 0.02) ? "braking" : S.fly > 0 ? "via diodes" : "none");
+    ro("spd", fmt(Math.abs(S.w) * 100));
+    const key = state + (S.fly > 0 ? "f" : "") + (Math.abs(S.w) > 0.02 ? "s" : "") + S.mode;
+    if (key !== lastState) { lastState = key; status(state); }
+  }
+  function status(state) {
+    const spin = Math.abs(S.w) > 0.02;
+    const M = {
+      fwd: ["info", "<b>Forward.</b> Q1 connects A to V+ and Q4 connects B to ground, so current flows A → B through the motor."],
+      rev: ["info", "<b>Reverse.</b> Q3 connects B to V+ and Q2 connects A to ground. Current flows B → A, so the motor turns the other way."],
+      brakeLow: ["info", spin ? "<b>Braking.</b> Both motor terminals are tied to ground. The spinning motor acts as a generator, and its back-EMF drives current around this loop, producing torque that stops it quickly." : "<b>Brake (low side).</b> Both terminals are grounded. The motor resists being turned by hand."],
+      brakeHigh: ["info", spin ? "<b>Braking (high side).</b> Both terminals are tied to V+. The effect is the same as low-side braking: the motor is shorted through the switches." : "<b>Brake (high side).</b> Both terminals sit at V+, so no voltage appears across the motor."],
+      coast: ["info", S.fly > 0 ? "<b>Flyback.</b> The switches just opened, but the winding inductance keeps current flowing. It returns to the supply through D2 and D3 (or D1 and D4), clamping the voltage spike. Shown slowed down; in reality this lasts microseconds to milliseconds." : spin ? "<b>Coasting.</b> All switches are open, so the motor is disconnected. Only friction slows it down." : "<b>Off.</b> All switches are open. Close one top switch and the opposite bottom switch to drive the motor."],
+      shoot: ["warn", "<b>Shoot-through!</b> A top and bottom switch on the same side are closed together, shorting V+ straight to ground. In a real circuit this means a huge current spike, blown transistors and possibly a fire. Driver chips make this state impossible."]
+    };
+    const [cls, txt] = M[state];
+    statusEl.className = "status " + cls; statusEl.innerHTML = txt;
+  }
+  return { init, tick };
+})();
+/* ================= 4. PID WITH ENCODER ================= */
+MODS.pid = (() => {
+  const PL = { R: 2.0, K: 0.05, J0: 2e-4, b: 1e-5, G: 30, Vmax: 12 };
+  const DEF = {
+    pos: { Kp: 0.15, Ki: 0, Kd: 0, sp: 90, unit: "°", rng: { Kp: [0, 10, 0.01], Ki: [0, 20, 0.05], Kd: [0, 0.3, 0.001], sp: [-180, 180, 5] } },
+    speed: { Kp: 0.1, Ki: 0, Kd: 0, sp: 40, unit: "RPM", rng: { Kp: [0, 3, 0.01], Ki: [0, 30, 0.05], Kd: [0, 0.05, 0.0005], sp: [-70, 70, 1] } }
+  };
+  const S = {
+    mode: "pos", gains: { pos: { ...DEF.pos }, speed: { ...DEF.speed } },
+    th: 0, w: 0, t: 0, tNext: 0, Ts: 0.005, PPR: 11, inertia: 1, fric: 2, load: false, loadTq: 8,
+    square: true, sqT: 0, spHigh: true, aw: true, dMeas: true, dFc: 30, sFc: 40, simSpeed: 1,
+    c: null, sp: 0, rec: null, showParts: false, enc: [], ol: null, tPlot: 0
+  };
+  let plot, outPlot, ro, hint, gainsEl, setEl, plantEl, sl = {}, znEl, mdEl, mnEl, znRes = null, model = null;
+  const g = () => S.gains[S.mode];
+
+  function resetCtl() { S.c = { integ: 0, prevMeas: null, prevE: 0, dF: 0, u: 0, uP: 0, uI: 0, uD: 0, prevCounts: null, sF: 0, meas: 0, sat: 0 }; }
+  function resetAll() { S.lastRec = null; S.th = 0; S.w = 0; S.t = 0; S.tNext = 0; S.sqT = 0; S.spHigh = true; S.enc = []; resetCtl(); S.rec = null; plot && plot.clear(); outPlot && outPlot.clear(); }
+
+  function init() {
+    resetCtl();
+    plot = new Plot($("#pidPlot"), { window: 4, auto: true, includeZero: true, minSpan: 20, unit: "°", traces: [{ color: "ink", dash: true, step: true, width: 1.6 }, { color: "copper", width: 2.2 }] });
+    outPlot = new Plot($("#pidOut"), { window: 4, yMin: -13, yMax: 13, unit: "V", traces: [{ color: "field", width: 2 }, { color: "amber", width: 1.4, hidden: true }, { color: "ok", width: 1.4, hidden: true }, { color: "north", width: 1.4, hidden: true }] });
+    gainsEl = $("#pidGains"); setEl = $("#pidSet"); plantEl = $("#pidPlant"); hint = $("#pidMetricHint");
+    ro = readouts($("#pidMetrics"), [["rise", "Rise time", "s"], ["os", "Overshoot", "%"], ["st", "Settling (2%)", "s"], ["sse", "Steady error", ""]]);
+    buildPlant(); buildTuners();
+    segmented($("#pidTabs"), v => { S.mode = v; resetAll(); buildGains(); buildSet(); updLegend(); model = null; renderModel(); znRes = null; renderZN(); });
+    buildGains(); buildSet(); updLegend(); resetAll();
+  }
+  function updLegend() {
+    $("#pidOutLegend").innerHTML = `<span><i style="background:var(--field)"></i>Motor voltage</span>` +
+      (S.showParts ? `<span><i style="background:var(--amber)"></i>P</span><span><i style="background:var(--ok)"></i>I</span><span><i style="background:var(--north)"></i>D</span>` : "");
+    plot.o.unit = DEF[S.mode].unit;
+  }
+  function buildGains() {
+    gainsEl.innerHTML = ""; heading(gainsEl, "Controller gains");
+    const r = DEF[S.mode].rng, G = g();
+    const u = S.mode === "pos" ? ["V/°", "V/(°·s)", "V·s/°"] : ["V/RPM", "V/(RPM·s)", "V·s/RPM"];
+    sl.Kp = slider(gainsEl, { label: `Kp <small style="color:var(--muted)">${u[0]}</small>`, min: r.Kp[0], max: r.Kp[1], step: r.Kp[2], value: G.Kp, editable: true, fmt: v => fmt(v, 3), onInput: v => G.Kp = v });
+    sl.Ki = slider(gainsEl, { label: `Ki <small style="color:var(--muted)">${u[1]}</small>`, min: r.Ki[0], max: r.Ki[1], step: r.Ki[2], value: G.Ki, editable: true, fmt: v => fmt(v, 3), onInput: v => { G.Ki = v; if (!v) S.c.integ = 0; } });
+    sl.Kd = slider(gainsEl, { label: `Kd <small style="color:var(--muted)">${u[2]}</small>`, min: r.Kd[0], max: r.Kd[1], step: r.Kd[2], value: G.Kd, editable: true, fmt: v => fmt(v, 4), onInput: v => G.Kd = v });
+    const rw = row(gainsEl);
+    button(rw, "Reset gains", () => setGains(DEF[S.mode].Kp, 0, 0));
+    button(rw, "Zero all", () => setGains(0, 0, 0));
+  }
+  function setGains(kp, ki, kd) { sl.Kp.set(kp); sl.Ki.set(ki); sl.Kd.set(kd); S.c.integ = 0; }
+  function buildSet() {
+    setEl.innerHTML = ""; heading(setEl, "Setpoint and disturbance");
+    const r = DEF[S.mode].rng.sp;
+    sl.sp = slider(setEl, { label: S.mode === "pos" ? "Target angle" : "Target speed", min: r[0], max: r[1], step: r[2], value: g().sp, unit: DEF[S.mode].unit, onInput: v => g().sp = v });
+    const c1 = checkbox(setEl, S.mode === "pos" ? "Square wave (target ↔ 0 every 1.5 s)" : "Square wave (target ↔ reverse every 1.5 s)", S.square, v => { S.square = v; S.spHigh = true; S.sqT = 0; });
+    sl.sqChk = c1;
+    const rw = row(setEl);
+    const lb = button(rw, "Add load torque", () => { S.load = !S.load; lb.setAttribute("aria-pressed", S.load); lb.textContent = S.load ? "Remove load torque" : "Add load torque"; });
+    button(rw, "Kick", () => { S.w += (S.mode === "pos" ? 60 : 40) * (Math.random() < 0.5 ? -1 : 1); });
+    button(rw, "Restart", resetAll);
+  }
+  function buildPlant() {
+    heading(plantEl, "Motor, encoder and loop timing");
+    slider(plantEl, { label: "Sample time", min: 1, max: 50, step: 1, value: S.Ts * 1000, unit: "ms", onInput: v => { S.Ts = v / 1000; } });
+    slider(plantEl, { label: "Encoder resolution", min: 3, max: 1000, log: true, value: S.PPR, unit: "PPR", fmt: v => fmt(v), onInput: v => { S.PPR = Math.round(v); S.c.prevCounts = null; } });
+    slider(plantEl, { label: "Load inertia", min: 1, max: 10, step: 0.5, value: S.inertia, dec: 1, unit: "×", onInput: v => S.inertia = v });
+    slider(plantEl, { label: "Friction", min: 0, max: 8, step: 0.5, value: S.fric, dec: 1, unit: "mN·m", onInput: v => S.fric = v });
+    slider(plantEl, { label: "D-term filter", min: 2, max: 200, log: true, value: S.dFc, unit: "Hz", fmt: v => v >= 199 ? "off" : fmt(v), onInput: v => S.dFc = v });
+    slider(plantEl, { label: "Speed filter (speed mode)", min: 2, max: 200, log: true, value: S.sFc, unit: "Hz", fmt: v => v >= 199 ? "off" : fmt(v), onInput: v => S.sFc = v });
+    checkbox(plantEl, "Anti-windup", S.aw, v => S.aw = v);
+    checkbox(plantEl, "D on measurement (no derivative kick)", S.dMeas, v => S.dMeas = v);
+    checkbox(plantEl, "Show P, I and D parts of the output", S.showParts, v => { S.showParts = v; [1, 2, 3].forEach(i => outPlot.o.traces[i].hidden = !v); outPlot.o.yMin = v ? -13 : -13; updLegend(); });
+    slider(plantEl, { label: "Simulation speed", min: 0.1, max: 1, step: 0.05, value: 1, dec: 2, unit: "×", onInput: v => S.simSpeed = v });
+  }
+
+  /* ---------- physics + controller ---------- */
+  const H = 0.0005;
+  function counts() { return Math.floor(S.th / TAU * S.PPR * 4); }
+  function physics(u) {
+    const J = PL.J0 * S.inertia;
+    const i = (u - PL.K * S.w) / PL.R;
+    let tq = PL.K * i - PL.b * S.w - (S.load ? S.loadTq / 1000 : 0);
+    const cf = S.fric / 1000;
+    if (Math.abs(S.w) > 0.05) tq -= Math.sign(S.w) * cf;
+    else if (Math.abs(tq) <= cf) { tq = 0; S.w = 0; }
+    else tq -= Math.sign(tq) * cf;
+    S.w += tq / J * H; S.th += S.w * H;
+  }
+  function sample() {
+    const c = S.c, G = g(), Ts = S.Ts;
+    const n = counts();
+    const cpr = S.PPR * 4 * PL.G;
+    let meas;
+    if (S.mode === "pos") meas = n / cpr * 360;
+    else {
+      const raw = c.prevCounts === null ? 0 : (n - c.prevCounts) / cpr / Ts * 60;
+      const a = S.sFc >= 199 ? 1 : 1 - Math.exp(-TAU * S.sFc * Ts);
+      c.sF += a * (raw - c.sF); meas = c.sF;
+    }
+    c.prevCounts = n; c.meas = meas;
+    if (S.ol) { c.u = S.ol.V; c.uP = c.uI = c.uD = 0; return; }
+    const e = S.sp - meas;
+    const P = G.Kp * e;
+    let dRaw = 0;
+    if (c.prevMeas !== null) dRaw = S.dMeas ? -(meas - c.prevMeas) / Ts : (e - c.prevE) / Ts;
+    const ad = S.dFc >= 199 ? 1 : 1 - Math.exp(-TAU * S.dFc * Ts);
+    c.dF += ad * (dRaw - c.dF);
+    const D = G.Kd * c.dF;
+    const I0 = G.Ki * c.integ;
+    let u = P + I0 + D;
+    const sat = Math.abs(u) > PL.Vmax;
+    if (!(S.aw && sat && Math.sign(e) === Math.sign(u))) c.integ += e * Ts;
+    if (S.aw && G.Ki > 0) { const lim = PL.Vmax * 1.5 / G.Ki; c.integ = clamp(c.integ, -lim, lim); }
+    u = clamp(P + G.Ki * c.integ + D, -PL.Vmax, PL.Vmax);
+    c.u = u; c.uP = P; c.uI = G.Ki * c.integ; c.uD = D; c.prevMeas = meas; c.prevE = e;
+  }
+  function stepSim(simDt) {
+    let t = 0;
+    while (t < simDt - 1e-9) {
+      // setpoint schedule
+      if (!S.ol) {
+        if (S.square) { S.sqT += H; if (S.sqT >= 1.5) { S.sqT = 0; S.spHigh = !S.spHigh; } }
+        const sp = S.square ? (S.spHigh ? g().sp : (S.mode === "speed" ? -g().sp : 0)) : g().sp;
+        if (sp !== S.sp || !S.rec) { S.sp = sp; S.lastRec = S.rec; S.rec = { t0: S.t, y0: S.c.meas, r: sp, ys: [], sat: 0 }; }
+      }
+      if (S.t >= S.tNext) {
+        S.tNext += S.Ts; if (S.tNext < S.t) S.tNext = S.t + S.Ts;
+        sample();
+        if (S.rec && !S.ol) { S.rec.ys.push(S.t - S.rec.t0, S.c.meas); if (Math.abs(S.c.u) >= PL.Vmax - 1e-6) S.rec.sat += S.Ts; }
+        if (S.ol) S.ol.data.push(S.t - S.ol.t0, S.th);
+      }
+      physics(S.c.u);
+      S.enc.push(S.t, S.th); if (S.enc.length > 600) S.enc.splice(0, S.enc.length - 600);
+      S.t += H; t += H;
+      if (S.t - S.tPlot >= 0.004) {
+        S.tPlot = S.t;
+        plot.push(S.t, [S.sp, S.c.meas]);
+        outPlot.push(S.t, [S.c.u, clamp(S.c.uP, -13, 13), clamp(S.c.uI, -13, 13), clamp(S.c.uD, -13, 13)]);
+      }
+      if (S.ol && S.t - S.ol.t0 > 1.3) finishOL();
+    }
+  }
+
+  /* ---------- metrics + hints ---------- */
+  function metrics() {
+    let r = S.rec; if (!r) return;
+    if (S.lastRec && r.ys.length > 1 && r.ys[r.ys.length - 2] < 1.0 && S.lastRec.ys.length > 4 && Math.abs(S.lastRec.r - S.lastRec.y0) > 1e-6) r = S.lastRec;
+    const step = r.r - r.y0, ys = r.ys;
+    const quant = S.mode === "pos" ? 360 / (S.PPR * 4 * PL.G) : 0;
+    if (Math.abs(step) < 1e-6 || ys.length < 4) { ["rise", "os", "st", "sse"].forEach(k => ro(k, "–")); return; }
+    let t10 = null, t90 = null, mx = -Infinity, lastOut = 0;
+    const band = 0.02 + quant / Math.abs(step);
+    for (let k = 0; k < ys.length; k += 2) {
+      const n = (ys[k + 1] - r.y0) / step;
+      if (t10 === null && n >= 0.1) t10 = ys[k];
+      if (t90 === null && n >= 0.9) t90 = ys[k];
+      mx = Math.max(mx, n);
+      if (Math.abs(n - 1) > band) lastOut = ys[k];
+    }
+    const dur = ys[ys.length - 2];
+    ro("rise", t10 !== null && t90 !== null ? fmt(t90 - t10, 3) : "–");
+    ro("os", t90 !== null ? fmt(Math.max(0, mx - 1) * 100, 1) : "–");
+    ro("st", dur - lastOut > 0.15 ? fmt(lastOut, 2) : "–");
+    let sse = null;
+    if (dur > 0.7) { let s = 0, n = 0; for (let k = ys.length - 2; k >= 0 && ys[k] > dur - 0.25; k -= 2) { s += ys[k + 1]; n++; } sse = r.r - s / n; }
+    ro("sse", sse === null ? "–" : fmt(sse, S.mode === "pos" ? 1 : 1) + " " + DEF[S.mode].unit);
+    // diagnosis
+    const G = g();
+    let msg;
+    let flips = 0, amp = 0;
+    if (dur > 0.8) { let prev = 0; for (let k = 0; k < ys.length; k += 2) if (ys[k] > dur - 0.8) { const d = ys[k + 1] - r.r; amp = Math.max(amp, Math.abs(d)); const s = Math.sign(d); if (s && prev && s !== prev) flips++; if (s) prev = s; } }
+    if (!G.Kp && !G.Ki && !G.Kd) msg = "All gains are zero, so the controller never applies any voltage.";
+    else if (flips >= 4 && amp > Math.max(0.03 * Math.abs(step), 2 * quant)) msg = "It is still oscillating. Lower Kp or add Kd. If Kd is already large, the D term may be amplifying encoder noise; lower the D filter frequency.";
+    else if (t90 !== null && mx - 1 > 0.15) msg = "Overshoot is high. Add some Kd to brake before the target, or lower Kp" + (G.Ki > 0 ? " or Ki." : ".");
+    else if (sse !== null && Math.abs(sse) > Math.max(0.02 * Math.abs(step), 1.5 * quant) && !G.Ki) msg = "It stops short of the target. Friction or load needs a constant voltage that P alone only produces with some error. Add a little Ki.";
+    else if (t90 === null && dur > 0.8) msg = "It never reaches 90% of the step. Raise Kp" + (G.Ki ? " or Ki." : ", or add Ki.");
+    else if (t90 !== null && t10 !== null && t90 - t10 > 0.45) msg = "The response is slow. Raise Kp, then add Kd if it starts to overshoot.";
+    else if (r.sat > 0.6 * (t90 || 1)) msg = "Good response. The output sits at ±12 V during most of the rise, so the motor is already as fast as it can go; more gain will not shorten the rise time.";
+    else if (t90 !== null) msg = "Looks well tuned. Test it: add the load torque, kick the shaft, or lower the encoder resolution.";
+    else msg = "Waiting for the response to develop…";
+    if (hint.textContent !== msg) hint.textContent = msg;
+  }
+
+  /* ---------- drawing ---------- */
+  function drawMotor() {
+    const { ctx, w, h } = fitCanvas($("#pidMotor"));
+    ctx.clearRect(0, 0, w, h);
+    const cx = w * 0.42, cy = h * 0.56, R = Math.min(w * 0.3, h * 0.36);
+    const outAng = S.th / PL.G; // rad
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.fillStyle = C.muted; ctx.font = "11px Barlow, sans-serif"; ctx.textAlign = "center";
+    for (let a = 0; a < 360; a += 30) { const r = -a * Math.PI / 180 - Math.PI / 2 + Math.PI; const x = Math.cos(a * Math.PI / 180 - Math.PI / 2), y = Math.sin(a * Math.PI / 180 - Math.PI / 2); ctx.beginPath(); ctx.moveTo(cx + x * (R + 4), cy + y * (R + 4)); ctx.lineTo(cx + x * (R + 10), cy + y * (R + 10)); ctx.stroke(); }
+    ctx.fillStyle = C.surface; ctx.strokeStyle = C.muted; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill(); ctx.stroke();
+    if (S.mode === "pos") { // target ghost
+      const ta = S.sp * Math.PI / 180 - Math.PI / 2;
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ta) * R * 1.12, cy + Math.sin(ta) * R * 1.12); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const a = outAng - Math.PI / 2;
+    ctx.strokeStyle = C.copper; ctx.lineWidth = 7; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R * 0.95, cy + Math.sin(a) * R * 0.95); ctx.stroke(); ctx.lineCap = "butt";
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, TAU); ctx.fill();
+    // voltage bar
+    const bx = w - 34, by = 28, bh = h - 50, v = S.c.u;
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(bx, by, 14, bh);
+    ctx.fillStyle = C.field; const mid = by + bh / 2, hh = v / 12 * bh / 2; ctx.fillRect(bx, Math.min(mid, mid - hh), 14, Math.abs(hh));
+    ctx.fillStyle = C.muted; ctx.font = "11px Barlow, sans-serif"; ctx.textAlign = "center"; ctx.fillText(fmt(v, 1) + " V", bx + 7, by + bh + 16);
+    ctx.textAlign = "left"; ctx.fillStyle = C.ink; ctx.font = "600 15px Barlow, sans-serif";
+    const deg = S.th / PL.G * 180 / Math.PI, rpm = S.w / PL.G * 60 / TAU;
+    ctx.fillText(S.mode === "pos" ? fmt(S.c.meas, 1) + "° measured" : fmt(S.c.meas, 1) + " RPM measured", 12, h - 30);
+    ctx.font = "13px Barlow, sans-serif"; ctx.fillStyle = C.muted;
+    ctx.fillText(S.mode === "pos" ? "true " + fmt(deg, 2) + "°" : "true " + fmt(rpm, 1) + " RPM", 12, h - 12);
+  }
+  function drawEnc() {
+    const { ctx, w, h } = fitCanvas($("#pidEnc"));
+    ctx.clearRect(0, 0, w, h);
+    const E = S.enc; if (E.length < 4) return;
+    const win = 0.04, tEnd = E[E.length - 2], x0 = 36, x1 = w - 12;
+    const rows = [["A", 70], ["B", 140]];
+    ctx.font = "600 14px Barlow, sans-serif"; ctx.fillStyle = C.ink; ctx.textAlign = "left";
+    for (const [lab, yb] of rows) {
+      ctx.fillStyle = C.muted; ctx.fillText(lab, 12, yb - 8);
+      ctx.strokeStyle = lab === "A" ? C.copper : C.field; ctx.lineWidth = 2; ctx.beginPath();
+      let started = false, prevY = 0;
+      for (let k = 0; k < E.length; k += 2) {
+        if (E[k] < tEnd - win) continue;
+        const ph = E[k + 1] / TAU * S.PPR, fr = ((ph % 1) + 1) % 1;
+        const hi = lab === "A" ? fr < 0.5 : ((fr + 0.75) % 1) < 0.5;
+        const x = x0 + (E[k] - (tEnd - win)) / win * (x1 - x0), y = hi ? yb - 30 : yb;
+        if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, prevY); ctx.lineTo(x, y); }
+        prevY = y;
+      }
+      ctx.stroke();
+    }
+    const n = counts(), dir = S.w > 0.5 ? "A leads B: turning forward" : S.w < -0.5 ? "B leads A: turning backward" : "Not moving: no edges";
+    ctx.fillStyle = C.ink; ctx.font = "600 15px Barlow, sans-serif"; ctx.fillText("Count " + n, 12, h - 30);
+    ctx.fillStyle = C.muted; ctx.font = "13px Barlow, sans-serif"; ctx.fillText(dir, 12, h - 12);
+  }
+
+  /* ---------- tuning assistants ---------- */
+  function buildTuners() {
+    mnEl = $("#tuneManual"); znEl = $("#tuneZN"); mdEl = $("#tuneModel");
+    mnEl.innerHTML = `<div class="grp"><h3>Method 1</h3><h2 style="font:600 22px/1.15 var(--cond);margin:0 0 8px">Trial and error</h2>
+      <ol style="margin:0;padding-left:20px;font-size:15px">
+        <li>Set Ki and Kd to zero. Leave the square wave on.</li>
+        <li>Raise Kp until the response is quick with a little overshoot.</li>
+        <li>Add Kd until the overshoot mostly disappears. If that allows it, raise Kp a bit more.</li>
+        <li>Turn on the load torque. If the shaft no longer reaches the target, add Ki slowly until the error goes away.</li>
+        <li>If adding Ki brings back overshoot, lower it or add a little more Kd.</li>
+      </ol><div class="row" style="margin-top:10px" id="mnBtns"></div>
+      <p class="hint" style="margin:10px 0 0">The hint under the step response diagnoses what you see.</p></div>`;
+    const mb = $("#mnBtns", mnEl);
+    button(mb, "Start: P only", () => { setGains(S.mode === "pos" ? 0.05 : 0.05, 0, 0); S.square = true; sl.sqChk.checked = true; });
+    znEl.innerHTML = `<div class="grp"><h3>Method 2</h3><h2 style="font:600 22px/1.15 var(--cond);margin:0 0 8px">Ziegler–Nichols ultimate gain</h2>
+      <ol style="margin:0;padding-left:20px;font-size:15px">
+        <li>Press <b>Prepare</b>: P only, steady target.</li>
+        <li>Raise Kp until the shaft keeps oscillating with a constant amplitude. Use <b>Kick</b> to start it. That Kp is the ultimate gain Ku.</li>
+        <li>Press <b>Measure</b> to read the oscillation period Tu, then apply a rule.</li>
+      </ol><div class="row" style="margin-top:10px" id="znBtns"></div><div id="znOut" style="margin-top:10px"></div></div>`;
+    const zb = $("#znBtns", znEl);
+    button(zb, "Prepare", () => { sl.Ki.set(0); sl.Kd.set(0); S.square = false; sl.sqChk.checked = false; S.c.integ = 0; znRes = null; renderZN("Now raise Kp step by step. Higher sample times make oscillation easier to reach."); });
+    button(zb, "Measure", measureZN, "primary");
+    mdEl.innerHTML = `<div class="grp"><h3>Method 3</h3><h2 style="font:600 22px/1.15 var(--cond);margin:0 0 8px">Model from an open-loop step</h2>
+      <p style="margin:0 0 8px;font-size:15px">Apply a fixed 6 V with the controller off, measure how the motor responds, and fit a first-order model. Then compute gains for the response you want.</p>
+      <div class="row" id="mdBtns"></div><div id="mdOut" style="margin-top:10px"></div></div>`;
+    button($("#mdBtns", mdEl), "Run step test", startOL, "primary");
+    renderZN(); renderModel();
+  }
+  function measureZN() {
+    const d = plot.data[1], t1 = plot.t, t0 = t1 - 2.5;
+    const pts = []; for (let k = 0; k < d.length; k += 2) if (d[k] >= t0) pts.push([d[k], d[k + 1]]);
+    if (pts.length < 50) return renderZN("Not enough data yet.");
+    const mean = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const crosses = []; let amp = 0;
+    for (let i = 1; i < pts.length; i++) { amp = Math.max(amp, Math.abs(pts[i][1] - mean)); if (pts[i - 1][1] < mean && pts[i][1] >= mean) crosses.push(pts[i][0]); }
+    const quant = S.mode === "pos" ? 360 / (S.PPR * 4 * PL.G) : 2;
+    if (crosses.length < 3 || amp < 1.5 * quant) return renderZN("No steady oscillation found in the last 2.5 s. Raise Kp further and press Kick.");
+    const Tu = (crosses[crosses.length - 1] - crosses[0]) / (crosses.length - 1);
+    znRes = { Ku: g().Kp, Tu, amp }; renderZN();
+  }
+  function renderZN(msg) {
+    const out = $("#znOut", znEl); if (!out) return;
+    if (!znRes) { out.innerHTML = msg ? `<div class="status info">${msg}</div>` : ""; return; }
+    const { Ku, Tu } = znRes;
+    const rules = [["Classic PID", 0.6 * Ku, 1.2 * Ku / Tu, 0.075 * Ku * Tu], ["PI only", 0.45 * Ku, 0.54 * Ku / Tu, 0], ["No overshoot", 0.2 * Ku, 0.4 * Ku / Tu, 0.066 * Ku * Tu]];
+    out.innerHTML = `<div class="status ok">Ku = <b>${fmt(Ku, 3)}</b>, Tu = <b>${fmt(Tu * 1000)} ms</b> (amplitude ${fmt(znRes.amp, 1)} ${DEF[S.mode].unit})</div>
+      <table class="tbl-mini" style="margin-top:8px"><tr><th>Rule</th><th>Kp</th><th>Ki</th><th>Kd</th><th></th></tr>
+      ${rules.map((r, i) => `<tr><td style="text-align:left">${r[0]}</td><td>${fmt(r[1], 3)}</td><td>${fmt(r[2], 2)}</td><td>${fmt(r[3], 4)}</td><td><button class="btn" type="button" data-i="${i}" style="padding:3px 8px">Apply</button></td></tr>`).join("")}</table>
+      <p class="hint" style="margin:8px 0 0">Ziegler–Nichols aims for fast disturbance rejection and usually overshoots. Treat it as a starting point and refine by hand.</p>`;
+    $$("button[data-i]", out).forEach(b => b.addEventListener("click", () => { const r = rules[+b.dataset.i]; setGains(r[1], r[2], r[3]); S.square = true; sl.sqChk.checked = true; }));
+  }
+  function startOL() {
+    S.th = 0; S.w = 0; resetCtl(); S.load = false;
+    S.ol = { t0: S.t, V: 6, data: [] };
+    $("#mdOut", mdEl).innerHTML = `<div class="status info">Applying 6 V with the controller off…</div>`;
+  }
+  function finishOL() {
+    const d = S.ol.data, V = S.ol.V; S.ol = null; resetCtl(); S.rec = null; S.lastRec = null;
+    // speed (output RPM) from encoder counts over a 10 ms window
+    const cpr = S.PPR * 4 * PL.G, sp = [];
+    const cnt = th => Math.floor(th / TAU * S.PPR * 4);
+    for (let i = 0; i < d.length; i += 2) {
+      let j = i; while (j < d.length - 2 && d[j] - d[i] < 0.01) j += 2;
+      if (j === i) break;
+      sp.push([(d[i] + d[j]) / 2, (cnt(d[j + 1]) - cnt(d[i + 1])) / cpr / (d[j] - d[i]) * 60]);
+    }
+    const tail = sp.filter(p => p[0] > 0.95); const ss = tail.reduce((s, p) => s + p[1], 0) / Math.max(1, tail.length);
+    const hit = sp.find(p => p[1] >= 0.632 * ss);
+    const tau = hit ? hit[0] : 0.2;
+    model = { K: ss / V, tau, ss };
+    renderModel();
+  }
+  function renderModel() {
+    const out = $("#mdOut", mdEl); if (!out) return;
+    if (!model) { out.innerHTML = ""; return; }
+    const { K, tau } = model;
+    if (S.mode === "speed") {
+      out.innerHTML = `<div class="status ok">Fitted model: speed/voltage = <b>${fmt(K, 2)}</b> RPM/V with time constant τ = <b>${fmt(tau * 1000)} ms</b></div>
+        <span class="formula" style="font-size:16px;margin-top:8px">G(s) = K / (τs + 1)</span><div id="mdS"></div><div id="mdG"></div>`;
+      const st = { lam: Math.max(0.05, tau * 0.6) };
+      const upd = () => { const Kp = tau / (K * st.lam), Ki = Kp / tau; $("#mdG", out).innerHTML = gainRow(Kp, Ki, 0, "Lambda (IMC) tuning for a PI controller: Kp = τ/(K·λ), Ki = Kp/τ. The closed loop should behave like a first-order system with time constant λ, if the voltage does not saturate."); };
+      slider($("#mdS", out), { label: "Desired closed-loop time constant λ", min: 0.02, max: 0.5, step: 0.01, value: st.lam, unit: "s", dec: 2, onInput: v => { st.lam = v; upd(); } });
+      upd();
+    } else {
+      const Kd_ = K * 6; // deg/s per V
+      out.innerHTML = `<div class="status ok">Fitted model: <b>${fmt(Kd_, 1)}</b> °/s per volt, τ = <b>${fmt(tau * 1000)} ms</b>. Position is the integral of speed, so the plant gets an extra 1/s.</div>
+        <span class="formula" style="font-size:16px;margin-top:8px">G(s) = K / (s·(τs + 1))</span><div id="mdS"></div><div id="mdG"></div>`;
+      const st = { wn: 12, z: 0.85 };
+      const upd = () => { const Kp = st.wn * st.wn * tau / Kd_, Kd = Math.max(0, (2 * st.z * st.wn * tau - 1) / Kd_); $("#mdG", out).innerHTML = gainRow(Kp, 0, Kd, "Pole placement for a PD controller: match τs² + (1 + K·Kd)s + K·Kp to the standard form s² + 2ζωₙs + ωₙ². Add a small Ki afterwards if friction leaves an error."); };
+      const box = $("#mdS", out);
+      slider(box, { label: "Natural frequency ωₙ", min: 3, max: 40, step: 1, value: st.wn, unit: "rad/s", onInput: v => { st.wn = v; upd(); } });
+      slider(box, { label: "Damping ratio ζ", min: 0.3, max: 1.5, step: 0.05, value: st.z, dec: 2, onInput: v => { st.z = v; upd(); } });
+      upd();
+    }
+  }
+  function gainRow(kp, ki, kd, note) {
+    setTimeout(() => { const b = $("#mdApply", mdEl); if (b) b.onclick = () => { setGains(kp, ki, kd); S.square = true; sl.sqChk.checked = true; }; });
+    return `<table class="tbl-mini" style="margin-top:6px"><tr><th>Kp</th><th>Ki</th><th>Kd</th><th></th></tr><tr><td>${fmt(kp, 3)}</td><td>${fmt(ki, 2)}</td><td>${fmt(kd, 4)}</td><td><button class="btn primary" type="button" id="mdApply" style="padding:3px 10px">Apply</button></td></tr></table><p class="hint" style="margin:8px 0 0">${note}</p>`;
+  }
+
+  return {
+    init,
+    tick(dt) { stepSim(dt * S.simSpeed); metrics(); plot.draw(); outPlot.draw(); drawMotor(); drawEnc(); }
+  };
+})();
+/* ================= 5. BALANCING ================= */
+MODS.balance = (() => {
+  const SYS = {
+    cart: { M: 1.0, m: 0.2, l: 0.5, Fmax: 20, Kp: 40, Ki: 0, Kd: 6, Kpx: 3.4, Kdx: 9, track: 2.4 },
+    robot: { M: 0.4, m: 1.2, l: 0.25, Fmax: 25, Kp: 60, Ki: 0, Kd: 5, Kpx: 3.4, Kdx: 7, r: 0.04 }
+  };
+  const S = { sys: "cart", p: null, x: 0, v: 0, th: 0.1, om: 0, F: 0, integ: 0, t: 0, tNext: 0, Ts: 0.01, noise: 0.2,
+    outer: false, xsp: 0, thref: 0, fallen: false, wall: false, okT: 0, simSpeed: 1, camX: 0, tPlot: 0, ix: 0 };
+  let plot, plot2, statusEl, ro, innerEl, outerEl, plantEl, thrEl, view, sl = {};
+
+  function init() {
+    view = $("#balView"); statusEl = $("#balStatus");
+    plot = new Plot($("#balPlot"), { window: 6, auto: true, includeZero: true, minSpan: 8, unit: "°", traces: [{ color: "copper", width: 2 }, { color: "ink", dash: true, width: 1.5 }] });
+    plot2 = new Plot($("#balPlot2"), { window: 6, auto: true, includeZero: true, minSpan: 1, unit: "m", traces: [{ color: "field", width: 2 }, { color: "ink", dash: true, width: 1.5, step: true }, { color: "muted", width: 1.2, alpha: 0.7, noScale: true }] });
+    const rd = document.createElement("div"); rd.className = "readouts"; rd.style.marginTop = "12px"; statusEl.after(rd);
+    ro = readouts(rd, [["th", "Tilt", "°"], ["x", "Position", "m"], ["f", "Force", "N"]]);
+    innerEl = $("#balInner"); outerEl = $("#balOuter"); plantEl = $("#balPlant");
+    $("#balReset").addEventListener("click", reset);
+    $("#balPushL").addEventListener("click", () => push(-1));
+    $("#balPushR").addEventListener("click", () => push(1));
+    view.addEventListener("click", e => {
+      const r = view.getBoundingClientRect(), px = e.clientX - r.left;
+      const { scale, ox } = geom(r.width, +view.dataset.h);
+      let x = (px - ox) / scale;
+      if (S.sys === "cart") x = clamp(x, -S.p.track + 0.4, S.p.track - 0.4);
+      S.xsp = Math.round(x * 10) / 10; sl.xsp && sl.xsp.set(S.xsp, true);
+    });
+    segmented($("#balTabs"), v => { S.sys = v; load(); });
+    load();
+  }
+  function load() {
+    S.p = { ...SYS[S.sys] };
+    S.xsp = 0; buildPanels(); reset();
+    $("#balCap").textContent = S.sys === "cart" ? "Click the track to set a target position" : "Click the floor to set a target position";
+  }
+  function reset() {
+    S.x = 0; S.v = 0; S.th = (Math.random() < 0.5 ? -1 : 1) * 0.1; S.om = 0; S.F = 0; S.integ = 0; S.ix = 0;
+    S.fallen = false; S.wall = false; S.okT = 0; S.camX = 0; S.tNext = S.t; plot.clear(); plot2.clear();
+  }
+  function push(dir) { if (!S.fallen) S.om += dir * (S.sys === "cart" ? 0.9 : 1.2); }
+
+  function buildPanels() {
+    const p = S.p;
+    innerEl.innerHTML = ""; heading(innerEl, "Angle loop (fast, inner)");
+    sl.Kp = slider(innerEl, { label: "Kp <small style='color:var(--muted)'>N/rad</small>", min: 0, max: 200, step: 1, value: p.Kp, editable: true, fmt: v => fmt(v, 1), onInput: v => { p.Kp = v; thr(); } });
+    sl.Ki = slider(innerEl, { label: "Ki <small style='color:var(--muted)'>N/(rad·s)</small>", min: 0, max: 100, step: 0.5, value: p.Ki, editable: true, fmt: v => fmt(v, 1), onInput: v => { p.Ki = v; if (!v) S.integ = 0; } });
+    sl.Kd = slider(innerEl, { label: "Kd <small style='color:var(--muted)'>N·s/rad</small>", min: 0, max: 30, step: 0.1, value: p.Kd, editable: true, fmt: v => fmt(v, 2), onInput: v => p.Kd = v });
+    thrEl = document.createElement("p"); thrEl.className = "hint"; thrEl.style.margin = "4px 0 0"; innerEl.appendChild(thrEl); thr();
+    outerEl.innerHTML = ""; heading(outerEl, "Position loop (slow, outer)");
+    checkbox(outerEl, "Enable position loop", S.outer, v => { S.outer = v; S.ix = 0; });
+    sl.Kpx = slider(outerEl, { label: "Kp <small style='color:var(--muted)'>° tilt per m</small>", min: 0, max: 15, step: 0.1, value: p.Kpx, editable: true, fmt: v => fmt(v, 1), onInput: v => p.Kpx = v });
+    sl.Kdx = slider(outerEl, { label: "Kd <small style='color:var(--muted)'>° tilt per m/s</small>", min: 0, max: 25, step: 0.1, value: p.Kdx, editable: true, fmt: v => fmt(v, 1), onInput: v => p.Kdx = v });
+    const lim = S.sys === "cart" ? p.track - 0.4 : 3;
+    sl.xsp = slider(outerEl, { label: "Target position", min: -lim, max: lim, step: 0.1, value: S.xsp, dec: 1, unit: "m", onInput: v => S.xsp = v });
+    plantEl.innerHTML = ""; heading(plantEl, S.sys === "cart" ? "Cart and pendulum" : "Robot");
+    const isC = S.sys === "cart";
+    slider(plantEl, { label: isC ? "Pendulum length (to center)" : "Body center of mass height", min: isC ? 0.15 : 0.08, max: isC ? 1.2 : 0.6, step: 0.01, value: p.l, dec: 2, unit: "m", onInput: v => p.l = v });
+    slider(plantEl, { label: isC ? "Pendulum mass" : "Body mass", min: 0.05, max: isC ? 2 : 4, step: 0.05, value: p.m, dec: 2, unit: "kg", onInput: v => { p.m = v; thr(); } });
+    slider(plantEl, { label: isC ? "Cart mass" : "Wheels and axle mass", min: 0.1, max: 3, step: 0.05, value: p.M, dec: 2, unit: "kg", onInput: v => { p.M = v; thr(); } });
+    slider(plantEl, { label: isC ? "Motor force limit" : "Wheel force limit", min: 2, max: 60, step: 1, value: p.Fmax, unit: "N", onInput: v => p.Fmax = v });
+    slider(plantEl, { label: "Sample time", min: 2, max: 50, step: 1, value: S.Ts * 1000, unit: "ms", onInput: v => S.Ts = v / 1000 });
+    slider(plantEl, { label: "Tilt sensor noise", min: 0, max: 3, step: 0.1, value: S.noise, dec: 1, unit: "°", onInput: v => S.noise = v });
+    slider(plantEl, { label: "Simulation speed", min: 0.1, max: 1, step: 0.05, value: S.simSpeed, dec: 2, unit: "×", onInput: v => S.simSpeed = v });
+  }
+  function thr() {
+    const need = (S.p.M + S.p.m) * 9.81;
+    const ok = S.p.Kp > need;
+    thrEl.innerHTML = `Gravity threshold: Kp must exceed (M + m)·g ≈ <b>${fmt(need, 1)}</b> N/rad. ${ok ? "Current Kp is above it." : "<span style='color:var(--warn)'>Current Kp is too low to hold it up.</span>"}`;
+  }
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+
+  function control() {
+    const p = S.p, D2R = Math.PI / 180;
+    const thm = S.th + gauss() * S.noise * D2R;
+    const omm = S.om + gauss() * S.noise * D2R * 3; // gyro rate
+    let thref = 0;
+    if (S.outer) thref = clamp(p.Kpx * D2R * (S.xsp - S.x) - p.Kdx * D2R * S.v, -10 * D2R, 10 * D2R);
+    S.thref = thref;
+    const e = thm - thref;
+    S.integ += e * S.Ts;
+    if (p.Ki > 0) { const lim = p.Fmax / p.Ki; S.integ = clamp(S.integ, -lim, lim); }
+    S.F = clamp(p.Kp * e + p.Ki * S.integ + p.Kd * omm, -p.Fmax, p.Fmax);
+  }
+  function physics(h) {
+    const p = S.p, g = 9.81, M = p.M, m = p.m, l = p.l, tot = M + m;
+    const F = S.fallen ? 0 : S.F;
+    const s = Math.sin(S.th), c = Math.cos(S.th);
+    const tmp = (F + m * l * S.om * S.om * s) / tot;
+    let al = (g * s - c * tmp) / (l * (4 / 3 - m * c * c / tot));
+    let ac = tmp - m * l * al * c / tot;
+    ac -= S.v * 0.1; // rolling friction
+    if (S.fallen) { ac = -S.v * 3; }
+    S.v += ac * h; S.x += S.v * h; S.om += al * h; S.th += S.om * h;
+    if (S.sys === "cart") {
+      const lim = p.track - 0.2;
+      if (Math.abs(S.x) > lim) { S.x = Math.sign(S.x) * lim; S.om -= S.v * c / l * 0.8; S.v = 0; if (!S.fallen) S.wall = true; }
+    }
+    if (Math.abs(S.th) > Math.PI / 2.4) { S.fallen = true; }
+    if (S.fallen) { // lie on the ground
+      const lim = S.sys === "cart" ? Math.PI / 2 : Math.PI / 2.05;
+      if (Math.abs(S.th) > lim) { S.th = Math.sign(S.th) * lim; S.om = 0; }
+    }
+  }
+  function step(simDt) {
+    const h = 0.001;
+    let t = 0;
+    while (t < simDt - 1e-9) {
+      if (S.t >= S.tNext) { S.tNext = S.t + S.Ts; if (!S.fallen) control(); }
+      physics(h); S.t += h; t += h;
+      if (S.t - S.tPlot > 0.01) {
+        S.tPlot = S.t;
+        plot.push(S.t, [S.th * 180 / Math.PI, S.thref * 180 / Math.PI]);
+        const sc = (S.sys === "cart" ? S.p.track : 2) * 0.8;
+        plot2.push(S.t, [S.x, S.outer ? S.xsp : NaN, S.F / S.p.Fmax * sc]);
+      }
+    }
+    if (!S.fallen && Math.abs(S.th) < 3 * Math.PI / 180 && Math.abs(S.om) < 0.3) S.okT += simDt; else S.okT = 0;
+  }
+  function status() {
+    let cls, msg;
+    if (S.fallen) { cls = "warn"; msg = S.wall ? "<b>Fell over.</b> The cart hit the end of the track, so it could not keep moving under the pendulum. Enable the position loop to keep it centered, then press Reset." : "<b>Fell over.</b> The controller could not catch it. Raise Kp above the gravity threshold and add Kd, then press Reset."; }
+    else if (S.okT > 1) cls = "ok", msg = S.outer ? "<b>Balanced.</b> Move the target or push it to test the position loop." : (Math.abs(S.v) > 0.05 ? "<b>Balanced, but drifting.</b> The angle loop keeps it upright without caring where the base goes. Enable the position loop to hold it in place." : "<b>Balanced.</b> Push it to test the response.");
+    else cls = "info", msg = "<b>Recovering…</b> The controller is catching the pendulum.";
+    statusEl.className = "status " + cls; if (statusEl.innerHTML !== msg) statusEl.innerHTML = msg;
+    ro("th", fmt(S.th * 180 / Math.PI, 1)); ro("x", fmt(S.x, 2)); ro("f", fmt(S.F, 1));
+  }
+
+  function geom(w, h) {
+    if (S.sys === "cart") { const scale = Math.min((w - 40) / (2 * S.p.track + 0.2), h / 1.9); return { scale, ox: w / 2, gy: h - 60 }; }
+    const scale = Math.min(320, h / 0.95); return { scale, ox: w / 2 - S.camX * scale, gy: h - 40 };
+  }
+  function draw() {
+    const { ctx, w, h } = fitCanvas(view);
+    ctx.clearRect(0, 0, w, h);
+    if (S.sys === "robot") S.camX += (S.x - S.camX) * 0.05;
+    const { scale, ox, gy } = geom(w, h);
+    const X = x => ox + x * scale, p = S.p;
+    ctx.lineCap = "round";
+    if (S.sys === "cart") {
+      // track
+      ctx.strokeStyle = C.muted; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(-p.track), gy + 22); ctx.lineTo(X(p.track), gy + 22); ctx.stroke();
+      ctx.fillStyle = C.muted; for (const s of [-1, 1]) ctx.fillRect(X(s * p.track) - 4, gy - 4, 8, 30);
+      ctx.font = "11px Barlow, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = C.muted; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+      for (let x = -Math.floor(p.track); x <= p.track; x += 0.5) { ctx.beginPath(); ctx.moveTo(X(x), gy + 24); ctx.lineTo(X(x), gy + 30); ctx.stroke(); if (Math.abs(x % 1) < 1e-6) ctx.fillText(x + " m", X(x), gy + 44); }
+      if (S.outer) { ctx.fillStyle = C.field; ctx.beginPath(); ctx.moveTo(X(S.xsp), gy + 24); ctx.lineTo(X(S.xsp) - 7, gy + 36); ctx.lineTo(X(S.xsp) + 7, gy + 36); ctx.fill(); }
+      // cart
+      const cw = 0.36 * scale, ch = 0.16 * scale, cx = X(S.x);
+      ctx.fillStyle = C.ink; ctx.fillRect(cx - cw / 2, gy - ch + 6, cw, ch);
+      ctx.fillStyle = C.muted; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + s * cw * 0.3, gy + 12, 9, 0, TAU); ctx.fill(); }
+      drawForce(ctx, cx, gy - ch / 2 + 6, cw);
+      drawPole(ctx, cx, gy - ch + 6, scale, false);
+    } else {
+      // floor
+      ctx.strokeStyle = C.muted; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.font = "11px Barlow, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = C.muted;
+      const x0 = Math.floor((0 - ox) / scale * 4) / 4, x1 = (w - ox) / scale;
+      for (let x = x0; x <= x1; x += 0.25) { ctx.beginPath(); ctx.moveTo(X(x), gy); ctx.lineTo(X(x) - 8, gy + 10); ctx.stroke(); if (Math.abs(x - Math.round(x)) < 1e-6) ctx.fillText(Math.round(x) + " m", X(x), gy + 26); }
+      if (S.outer) { ctx.fillStyle = C.field; ctx.beginPath(); ctx.moveTo(X(S.xsp), gy + 2); ctx.lineTo(X(S.xsp) - 7, gy + 14); ctx.lineTo(X(S.xsp) + 7, gy + 14); ctx.fill(); }
+      const r = Math.max(p.r * scale, 14), cx = X(S.x), cy = gy - r;
+      drawPole(ctx, cx, cy, scale, true);
+      ctx.fillStyle = "#2c3238"; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+      ctx.strokeStyle = C.copper; ctx.lineWidth = 3; const wa = S.x / (r / scale);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(wa) * r * 0.8, cy + Math.sin(wa) * r * 0.8); ctx.stroke();
+      ctx.fillStyle = C.paper; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
+      drawForce(ctx, cx, cy, r * 2);
+    }
+  }
+  function drawPole(ctx, px, py, scale, robot) {
+    const p = S.p, L = 2 * p.l * scale, a = S.th;
+    const tx = px + Math.sin(a) * L, ty = py - Math.cos(a) * L;
+    if (S.outer && !S.fallen) { // tilt target ghost
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = C.muted; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(S.thref) * L * 1.05, py - Math.cos(S.thref) * L * 1.05); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (robot) {
+      const bw = Math.max(0.09 * scale, 22);
+      ctx.save(); ctx.translate(px, py); ctx.rotate(a);
+      ctx.fillStyle = C.copper; ctx.globalAlpha = 0.9; ctx.fillRect(-bw / 2, -L, bw, L); ctx.globalAlpha = 1;
+      ctx.fillStyle = C.ink; ctx.fillRect(-bw / 2 + 4, -L * 0.55, bw - 8, L * 0.18); // battery
+      ctx.fillStyle = C.field; ctx.fillRect(-7, -L + 8, 14, 10); // IMU
+      ctx.fillStyle = C.surface; ctx.font = "600 9px Barlow, sans-serif"; ctx.textAlign = "center"; ctx.fillText("IMU", 0, -L + 30);
+      ctx.restore();
+    } else {
+      ctx.strokeStyle = C.copper; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty); ctx.stroke();
+      const br = 7 + Math.sqrt(p.m) * 9;
+      ctx.fillStyle = C.copper; ctx.beginPath(); ctx.arc(tx, ty, br, 0, TAU); ctx.fill();
+      ctx.fillStyle = C.paper; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 4, 0, TAU); ctx.stroke();
+    }
+  }
+  function drawForce(ctx, x, y, cw) {
+    const f = S.F / S.p.Fmax; if (Math.abs(f) < 0.02 || S.fallen) return;
+    const len = f * 70, x0 = x + Math.sign(f) * cw / 2 + Math.sign(f) * 4;
+    ctx.strokeStyle = C.field; ctx.fillStyle = C.field; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + len, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x0 + len + Math.sign(f) * 8, y); ctx.lineTo(x0 + len, y - 6); ctx.lineTo(x0 + len, y + 6); ctx.fill();
+  }
+  return {
+    init,
+    tick(dt) { step(dt * S.simSpeed); status(); draw(); plot.draw(); plot2.draw(); }
+  };
+})();
+
+/* ================= start ================= */
+readTheme();
+route();
+requestAnimationFrame(loop);
+</script>
+</body></html>
